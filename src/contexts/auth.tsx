@@ -36,14 +36,16 @@ function deleteCookie(name: string) {
 interface AuthContextType {
   isAuthenticated: boolean;
   userRole: UserRole | null;
-  login: (role: UserRole) => void;
+  userEmail: string | null;
+  login: (email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userRole: null,
-  login: () => {},
+  userEmail: null,
+  login: async () => {},
   logout: () => {},
 });
 
@@ -66,7 +68,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const getInitialAuthState = (): boolean => {
     if (typeof window === "undefined") return false;
     const storedRole = localStorage.getItem("userRole");
-    if (storedRole && (storedRole === "admin" || storedRole === "moderator")) {
+    const storedEmail = localStorage.getItem("userEmail");
+    if (
+      storedRole &&
+      (storedRole === "admin" || storedRole === "moderator") &&
+      storedEmail
+    ) {
       // Sync cookie with localStorage (for server-side middleware compatibility)
       const cookieRole = getCookie("userRole");
       if (!cookieRole) {
@@ -86,8 +93,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return null;
   };
 
+  const getInitialUserEmail = (): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("userEmail");
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
   const [userRole, setUserRole] = useState<UserRole | null>(getInitialUserRole);
+  const [userEmail, setUserEmail] = useState<string | null>(
+    getInitialUserEmail
+  );
 
   // Handle route protection (middleware handles most of this, but keep client-side check)
   useEffect(() => {
@@ -102,33 +117,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [isAuthenticated, router.pathname, router]);
 
-  const login = (role: UserRole) => {
-    // Store in localStorage first
-    localStorage.setItem("userRole", role);
+  const login = async (email: string, password: string, role: UserRole) => {
+    try {
+      // Import authAPI dynamically to avoid circular dependencies
+      const { authAPI } = await import("@/utils/api-client");
 
-    // Then update state
-    setIsAuthenticated(true);
-    setUserRole(role);
+      // Call the login API
+      const response = await authAPI.login(email, password, role);
 
-    // Also set cookie for middleware compatibility
-    setCookie("userRole", role);
+      if (response.success && response.user) {
+        // Store in localStorage
+        localStorage.setItem("userRole", response.user.role);
+        localStorage.setItem("userEmail", response.user.email);
 
-    router.push("/orders");
+        // Update state
+        setIsAuthenticated(true);
+        setUserRole(response.user.role as UserRole);
+        setUserEmail(response.user.email);
+
+        // Set cookie for middleware compatibility
+        setCookie("userRole", response.user.role);
+
+        router.push("/orders");
+      } else {
+        throw new Error("Login failed");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to login";
+      throw new Error(errorMessage);
+    }
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setUserRole(null);
+    setUserEmail(null);
     // Remove both cookie and localStorage
     deleteCookie("userRole");
     localStorage.removeItem("userRole");
+    localStorage.removeItem("userEmail");
     router.push("/");
   };
 
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
   }, []);
 
@@ -141,6 +176,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       value={{
         isAuthenticated,
         userRole,
+        userEmail,
         login,
         logout,
       }}

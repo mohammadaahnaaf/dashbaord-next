@@ -1,86 +1,118 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button, Input, Modal, Textarea } from '@/components/ui';
-import useStore from '@/store';
-// import { showToast } from '@/utils';
-import { callGeminiAPI } from '@/components/utils';
-import { Plus, Search, ArrowRight } from 'lucide-react';
-import { formatDate } from '@/components/utils';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button, Input, Modal, Textarea } from "@/components/ui";
+import { useAuth } from "@/contexts";
+import { callGeminiAPI } from "@/components/utils";
+import { Plus, Search, ArrowRight } from "lucide-react";
+import { formatDate, formatBDT } from "@/components/utils";
+import { batchesAPI, ordersAPI } from "@/utils/api-client";
+import { Batch, Order } from "@/types";
 
 export default function BatchesPage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { userEmail } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isGeneratingNote, setIsGeneratingNote] = useState(false);
-  const [batchNote, setBatchNote] = useState('');
+  const [batchNote, setBatchNote] = useState("");
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { batches, orders } = useStore();
+  // Fetch batches and orders on mount
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const filteredBatches = batches.filter(batch =>
-    batch.note.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    batch.id.toString().includes(searchQuery)
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [batchesData, ordersData] = await Promise.all([
+        batchesAPI.getAll(),
+        ordersAPI.getAll(),
+      ]);
+      setBatches(batchesData);
+      setOrders(ordersData);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      alert("Failed to load batches. Please refresh the page.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredBatches = batches.filter(
+    (batch) =>
+      (batch.note?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      batch.id.toString().includes(searchQuery)
   );
 
-  const handleCreateBatch = () => {
+  const handleCreateBatch = async () => {
     if (!batchNote.trim()) {
       alert("Please enter a batch note");
       return;
     }
 
-    const newBatch = {
-      id: batches.length + 1,
-      note: batchNote,
-      order_ids: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    // Add required 'created_by' field to match Batch type
-    };
+    try {
+      const createdBy = userEmail || "system";
+      const newBatch = await batchesAPI.create({
+        note: batchNote.trim(),
+        created_by: createdBy,
+        order_ids: [],
+      });
 
-    // Assume the created_by is the current user; if unavailable, fallback to "system"
-    const createdBy = typeof window !== "undefined" && window.localStorage.getItem("username")
-      ? window.localStorage.getItem("username")!
-      : "system";
-
-    const fixedBatch = {
-      ...newBatch,
-      created_by: createdBy,
-    };
-
-    useStore.setState({ batches: [...batches, fixedBatch] });
-    alert('Batch created successfully');
-    setIsCreateModalOpen(false);
-    setBatchNote('');
+      await fetchData(); // Refresh batches list
+      alert("Batch created successfully");
+      setIsCreateModalOpen(false);
+      setBatchNote("");
+    } catch (error: unknown) {
+      console.error("Error creating batch:", error);
+      const errorMessage =
+        error && typeof error === "object" && "error" in error
+          ? String((error as { error: string }).error)
+          : "Failed to create batch. Please try again.";
+      alert(errorMessage);
+    }
   };
 
   const handleSuggestBatchNote = async () => {
     setIsGeneratingNote(true);
     try {
       const note = await callGeminiAPI(
-        'Generate a concise but descriptive batch name for a group of e-commerce orders'
+        "Generate a concise but descriptive batch name for a group of e-commerce orders"
       );
       setBatchNote(note);
-      alert('Batch note generated successfully');
     } catch (error) {
-      alert('Failed to generate batch note');
+      alert("Failed to generate batch note");
     } finally {
       setIsGeneratingNote(false);
     }
   };
 
-  const calculateBatchSummary = (batchId: number) => {
-    const batch = batches.find(b => b.id === batchId);
-    if (!batch) return { totalOrders: 0, totalAmount: 0 };
-
-    const batchOrders = orders.filter(order => batch.order_ids.includes(order.id));
-    const totalAmount = batchOrders.reduce((sum, order) => sum + order.total_amount, 0);
+  const calculateBatchSummary = (orderIds: number[]) => {
+    const batchOrders = orders.filter((order) => orderIds.includes(order.id));
+    const totalAmount = batchOrders.reduce(
+      (sum, order) => sum + (order.total_amount || 0),
+      0
+    );
 
     return {
-      totalOrders: batch.order_ids.length,
+      totalOrders: orderIds.length,
       totalAmount,
     };
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <p className="text-gray-500">Loading batches...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -109,39 +141,84 @@ export default function BatchesPage() {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Note
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Orders
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Amount
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created At
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created By
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBatches.map((batch) => {
-                const { totalOrders, totalAmount } = calculateBatchSummary(batch.id);
-                return (
-                  <tr key={batch.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/batches/${batch.id}`)}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{batch.id}</td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">{batch.note}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{totalOrders}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{totalAmount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(batch.created_at)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/batches/${batch.id}`);
-                        }}
-                      >
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filteredBatches.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    No batches found. Create your first batch to get started.
+                  </td>
+                </tr>
+              ) : (
+                filteredBatches.map((batch) => {
+                  const { totalOrders, totalAmount } = calculateBatchSummary(
+                    batch.order_ids || []
+                  );
+                  return (
+                    <tr
+                      key={batch.id}
+                      className="hover:bg-gray-50 cursor-pointer"
+                      onClick={() => router.push(`/batches/${batch.id}`)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{batch.id}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500 max-w-md truncate">
+                        {batch.note || "-"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {totalOrders}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatBDT(totalAmount)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(batch.created_at)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {batch.created_by}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/batches/${batch.id}`);
+                          }}
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -151,7 +228,7 @@ export default function BatchesPage() {
         isOpen={isCreateModalOpen}
         onClose={() => {
           setIsCreateModalOpen(false);
-          setBatchNote('');
+          setBatchNote("");
         }}
         title="Create New Batch"
       >
@@ -179,14 +256,12 @@ export default function BatchesPage() {
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
-                setBatchNote('');
+                setBatchNote("");
               }}
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateBatch}>
-              Create Batch
-            </Button>
+            <Button onClick={handleCreateBatch}>Create Batch</Button>
           </div>
         </div>
       </Modal>

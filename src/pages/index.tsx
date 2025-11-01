@@ -2,23 +2,45 @@
 
 import { useState } from "react";
 import { UserRole } from "@/types";
-import { Button } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/contexts";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedRole, setSelectedRole] = useState<UserRole>("admin");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      return;
+    }
+
     setIsLoading(true);
     try {
-      login(selectedRole);
-    } catch (error) {
-      console.error("Login error:", error);
+      await login(email, password, selectedRole);
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Quick fill for demo
+  const fillDefaultCredentials = (role: UserRole) => {
+    setSelectedRole(role);
+    if (role === "admin") {
+      setEmail("admin@example.com");
+    } else {
+      setEmail("moderator@example.com");
+    }
+    setPassword("admin123");
   };
 
   return (
@@ -28,54 +50,114 @@ export default function LoginPage() {
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Sign in to Dashboard
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Use default credentials for demo
+          </p>
         </div>
-        <div className="mt-8 space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="space-y-4">
+            <div>
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            <div>
+              <Input
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Select Role
               </label>
               <div className="mt-2 space-y-2">
-                <label className="inline-flex items-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="radio"
-                    className="form-radio"
+                    className="form-radio h-4 w-4 text-blue-600"
                     name="role"
                     value="admin"
                     checked={selectedRole === "admin"}
-                    onChange={(e) =>
-                      setSelectedRole(e.target.value as UserRole)
-                    }
+                    onChange={(e) => {
+                      const role = e.target.value as UserRole;
+                      setSelectedRole(role);
+                      fillDefaultCredentials(role);
+                    }}
                   />
-                  <span className="ml-2">Admin</span>
+                  <span className="text-sm text-gray-700">Admin</span>
                 </label>
-                <br />
-                <label className="inline-flex items-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="radio"
-                    className="form-radio"
+                    className="form-radio h-4 w-4 text-blue-600"
                     name="role"
                     value="moderator"
                     checked={selectedRole === "moderator"}
-                    onChange={(e) =>
-                      setSelectedRole(e.target.value as UserRole)
-                    }
+                    onChange={(e) => {
+                      const role = e.target.value as UserRole;
+                      setSelectedRole(role);
+                      fillDefaultCredentials(role);
+                    }}
                   />
-                  <span className="ml-2">Moderator</span>
+                  <span className="text-sm text-gray-700">Moderator</span>
                 </label>
               </div>
+              
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fillDefaultCredentials("admin")}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Fill Admin Credentials
+                </button>
+                <span className="text-xs text-gray-400">|</span>
+                <button
+                  type="button"
+                  onClick={() => fillDefaultCredentials("moderator")}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Fill Moderator Credentials
+                </button>
+              </div>
             </div>
+
+            {error && (
+              <div className="rounded-md bg-red-50 p-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
           </div>
 
           <Button
-            onClick={handleLogin}
+            type="submit"
             loading={isLoading}
             className="w-full"
             size="lg"
           >
             Sign in
           </Button>
-        </div>
+
+          <div className="text-center text-xs text-gray-500 mt-4">
+            <p>Default credentials:</p>
+            <p>Admin: admin@example.com / admin123</p>
+            <p>Moderator: moderator@example.com / admin123</p>
+          </div>
+        </form>
       </div>
     </div>
   );

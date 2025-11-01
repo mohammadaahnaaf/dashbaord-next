@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import type { GetServerSideProps } from "next";
 import { Input, Button, StatusChip } from "@/components/ui";
@@ -21,9 +21,16 @@ export default function OrdersPage() {
   const orders = useStore((state) => state.orders);
   const customers = useStore((state) => state.customers);
   const currentUser = useStore((state) => state.currentUser);
+  const fetchOrders = useStore((state) => state.fetchOrders);
+  const fetchCustomers = useStore((state) => state.fetchCustomers);
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewingOrderId, setViewingOrderId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchOrders();
+    fetchCustomers();
+  }, [fetchOrders, fetchCustomers]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

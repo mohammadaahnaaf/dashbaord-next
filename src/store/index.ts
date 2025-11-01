@@ -9,6 +9,7 @@ import {
   Settings,
   User,
 } from "@/types";
+import { productsAPI, customersAPI, ordersAPI, batchesAPI } from "@/utils/api-client";
 
 // Mock data
 const mockProducts: Product[] = [
@@ -122,16 +123,70 @@ const mockSettings: Settings = {
 };
 
 // Create store
-const useStore = create<AppState>((set) => ({
+const useStore = create<AppState & {
+  fetchProducts: () => Promise<void>;
+  fetchCustomers: () => Promise<void>;
+  fetchOrders: () => Promise<void>;
+  fetchBatches: () => Promise<void>;
+  setCurrentUser: (role: any) => void;
+  addProduct: (product: Product) => void;
+  updateProduct: (id: number, product: Product) => void;
+  addCustomer: (customer: Customer) => void;
+  addOrder: (order: Order) => void;
+  updateOrder: (id: number, order: Order) => void;
+  addBatch: (batch: Batch) => void;
+  updateBatch: (id: number, batch: Batch) => void;
+  updateSettings: (settings: Settings) => void;
+  setEditingOrderId: (id: number | null) => void;
+}>((set) => ({
   currentUser: {
     role: null,
   },
-  products: mockProducts,
-  customers: mockCustomers,
-  orders: mockOrders,
-  batches: mockBatches,
+  products: [],
+  customers: [],
+  orders: [],
+  batches: [],
   settings: mockSettings,
   editingOrderId: null,
+
+  // API fetch functions
+  fetchProducts: async () => {
+    try {
+      const products = await productsAPI.getAll();
+      set({ products });
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+      // Fallback to mock data on error
+      set({ products: mockProducts });
+    }
+  },
+  fetchCustomers: async () => {
+    try {
+      const customers = await customersAPI.getAll();
+      set({ customers });
+    } catch (error) {
+      console.error('Failed to fetch customers:', error);
+      set({ customers: mockCustomers });
+    }
+  },
+  fetchOrders: async () => {
+    try {
+      const orders = await ordersAPI.getAll();
+      set({ orders });
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+      set({ orders: mockOrders });
+    }
+  },
+  fetchBatches: async () => {
+    try {
+      const batches = await batchesAPI.getAll();
+      set({ batches });
+    } catch (error) {
+      console.error('Failed to fetch batches:', error);
+      set({ batches: mockBatches });
+    }
+  },
 
   // Actions
   setCurrentUser: (role: any) =>
@@ -162,7 +217,7 @@ const useStore = create<AppState>((set) => ({
     set((state) => ({
       settings: { ...state.settings, ...settings },
     })),
-  setEditingOrderId: (id: number) => set({ editingOrderId: id }),
+  setEditingOrderId: (id: number | null) => set({ editingOrderId: id }),
 }));
 
 export default useStore;
