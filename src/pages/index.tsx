@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import { UserRole } from "@/types";
 import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/contexts";
+import axios from "axios";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -12,6 +14,30 @@ export default function LoginPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("admin");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pathaoLoading, setPathaoLoading] = useState(false);
+
+  async function getPathaoToken() {
+    try {
+      setPathaoLoading(true);
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_PATHAO_BASE_URL}/aladdin/api/v1/issue-token`,
+        {
+          client_id: process.env.NEXT_PUBLIC_PATHAO_CLIENT_ID,
+          client_secret: process.env.NEXT_PUBLIC_PATHAO_CLIENT_SECRET,
+          grant_type: "password",
+          username: "anamulhoquerafi118399@gmail.com",
+          password: "Test@11",
+        }
+      );
+      setPathaoLoading(false);
+      localStorage.setItem("pathao_access_token", response.data.access_token);
+      localStorage.setItem("pathao_refresh_token", response.data.refresh_token);
+      alert("Pathao token generated successfully");
+    } catch (error) {
+      setPathaoLoading(false);
+      console.error(error);
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +142,7 @@ export default function LoginPage() {
                   <span className="text-sm text-gray-700">Moderator</span>
                 </label>
               </div>
-              
+
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -151,12 +177,16 @@ export default function LoginPage() {
           >
             Sign in
           </Button>
+          <Button
+            type="button"
+            onClick={getPathaoToken}
+            className="w-full !hidden"
+            size="lg"
+          >
+            Get Pathao Token
+          </Button>
 
-          <div className="text-center text-xs text-gray-500 mt-4">
-            <p>Default credentials:</p>
-            <p>Admin: admin@example.com / admin123</p>
-            <p>Moderator: moderator@example.com / admin123</p>
-          </div>
+      
         </form>
       </div>
     </div>
