@@ -17,12 +17,12 @@ function setCookie(name: string, value: string, days: number = 7) {
 
 // Helper function to get cookie
 function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
   const nameEQ = name + "=";
-  const ca = document.cookie.split(';');
+  const ca = document.cookie.split(";");
   for (let i = 0; i < ca.length; i++) {
     let c = ca[i];
-    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    while (c.charAt(0) === " ") c = c.substring(1, c.length);
     if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
   }
   return null;
@@ -61,33 +61,41 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
 
-  // Initialize auth state from cookies and localStorage on mount
-  useEffect(() => {
-    // Check cookie first (for server-side middleware), then localStorage (for client-side)
-    const cookieRole = getCookie("userRole");
-    const storedRole = localStorage.getItem("userRole") || cookieRole;
-    
+  // Initialize state from localStorage using lazy initialization
+  const getInitialAuthState = (): boolean => {
+    if (typeof window === "undefined") return false;
+    const storedRole = localStorage.getItem("userRole");
     if (storedRole && (storedRole === "admin" || storedRole === "moderator")) {
-      const role = storedRole as UserRole;
-      setIsAuthenticated(true);
-      setUserRole(role);
-      // Sync cookie and localStorage
+      // Sync cookie with localStorage (for server-side middleware compatibility)
+      const cookieRole = getCookie("userRole");
       if (!cookieRole) {
-        setCookie("userRole", role);
+        setCookie("userRole", storedRole);
       }
-      if (!localStorage.getItem("userRole")) {
-        localStorage.setItem("userRole", role);
-      }
+      return true;
     }
-  }, []);
+    return false;
+  };
+
+  const getInitialUserRole = (): UserRole | null => {
+    if (typeof window === "undefined") return null;
+    const storedRole = localStorage.getItem("userRole");
+    if (storedRole && (storedRole === "admin" || storedRole === "moderator")) {
+      return storedRole as UserRole;
+    }
+    return null;
+  };
+
+  const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
+  const [userRole, setUserRole] = useState<UserRole | null>(getInitialUserRole);
 
   // Handle route protection (middleware handles most of this, but keep client-side check)
   useEffect(() => {
     const publicPaths = ["/", "/track"];
-    const isPublicPath = publicPaths.some((path) => router.pathname === path || router.pathname.startsWith(path + "/"));
+    const isPublicPath = publicPaths.some(
+      (path) =>
+        router.pathname === path || router.pathname.startsWith(path + "/")
+    );
 
     if (!isAuthenticated && !isPublicPath) {
       router.push("/");
@@ -95,11 +103,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [isAuthenticated, router.pathname, router]);
 
   const login = (role: UserRole) => {
+    // Store in localStorage first
+    localStorage.setItem("userRole", role);
+
+    // Then update state
     setIsAuthenticated(true);
     setUserRole(role);
-    // Set both cookie (for middleware) and localStorage (for client-side)
+
+    // Also set cookie for middleware compatibility
     setCookie("userRole", role);
-    localStorage.setItem("userRole", role);
+
     router.push("/orders");
   };
 
@@ -111,6 +124,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem("userRole");
     router.push("/");
   };
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <AuthContext.Provider

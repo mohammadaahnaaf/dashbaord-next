@@ -226,21 +226,42 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export function Input({ label, error, className, icon, ...props }: InputProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       {label && (
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-semibold text-gray-800">
           {label}
         </label>
       )}
-      <input
-        className={cn(
-          "block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm",
-          error && "border-red-300 focus:border-red-500 focus:ring-red-500",
-          className
+      <div className="relative">
+        {icon && (
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            {icon}
+          </div>
         )}
-        {...props}
-      />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+        <input
+          className={cn(
+            "block w-full px-4 py-3 text-base border !border-gray-200 rounded-xl transition-all duration-200",
+            "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+            "hover:border-gray-300 focus:shadow-lg disabled:bg-gray-50 disabled:text-gray-500",
+            icon ? "pl-10" : "",
+            error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
+            className
+          )}
+          {...props}
+        />
+      </div>
+      {error && (
+        <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -254,21 +275,35 @@ interface TextareaProps
 
 export function Textarea({ label, error, className, ...props }: TextareaProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       {label && (
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-semibold text-gray-800">
           {label}
         </label>
       )}
       <textarea
         className={cn(
-          "block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm",
-          error && "border-red-300 focus:border-red-500 focus:ring-red-500",
+          "block w-full px-4 py-3 text-base border !border-gray-200 rounded-xl transition-all duration-200",
+          "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+          "hover:border-gray-300 focus:shadow-lg resize-y disabled:bg-gray-50 disabled:text-gray-500",
+          "min-h-[100px]",
+          error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
           className
         )}
         {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -288,27 +323,59 @@ export function Select({
   ...props
 }: SelectProps) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       {label && (
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-semibold text-gray-800">
           {label}
         </label>
       )}
-      <select
-        className={cn(
-          "block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm",
-          error && "border-red-300 focus:border-red-500 focus:ring-red-500",
-          className
-        )}
-        {...props}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="relative">
+        <select
+          className={cn(
+            "block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 appearance-none",
+            "bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+            "hover:border-gray-300 focus:shadow-lg disabled:bg-gray-50 disabled:text-gray-500",
+            "pr-10", // space for dropdown arrow
+            error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
+            className
+          )}
+          {...props}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {/* Custom dropdown arrow */}
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <svg
+            className="w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </div>
+      </div>
+      {error && (
+        <p className="text-sm font-medium text-red-600 flex items-center gap-1">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          {error}
+        </p>
+      )}
     </div>
   );
 }

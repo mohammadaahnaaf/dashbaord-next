@@ -12,8 +12,9 @@ import {
   LogOut,
   Boxes,
   PlusCircle,
+  Menu,
 } from "lucide-react";
-
+import { useState } from "react";
 const navigation = [
   {
     name: "Orders",
@@ -53,7 +54,7 @@ const navigation = [
   },
 ];
 
-export default function Sidebar() {
+export function Sidebar() {
   const pathname = usePathname();
   const { userRole, logout } = useAuth();
 
@@ -63,7 +64,7 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="flex h-full fixed left-0 top-0 w-64 flex-col min-h-screen bg-gray-900">
+    <div className="lg:flex hidden h-full fixed left-0 top-0 z-20 w-64 flex-col min-h-screen bg-gray-900">
       <div className="flex h-16 shrink-0 items-center px-6">
         <span className="text-xl font-semibold text-white">Dashboard</span>
       </div>
@@ -110,5 +111,86 @@ export default function Sidebar() {
         </button>
       </div>
     </div>
+  );
+}
+
+export function MobileSidebar({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: (isOpen: boolean) => void;
+}) {
+  const pathname = usePathname();
+  const { userRole, logout } = useAuth();
+
+  const toggleSidebar = () => {
+    onClose(!isOpen);
+  };
+
+  // Don't render sidebar on public pages
+  if (pathname === "/" || pathname.startsWith("/track")) {
+    return null;
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          "flex !flex-col lg:hidden h-full fixed transition-all duration-300 left-0 top-0 z-20 w-64 min-h-screen bg-gray-900",
+          isOpen
+            ? "w-64 translate-x-0 opacity-100"
+            : "w-0 -translate-x-full opacity-0"
+        )}
+      >
+        <nav className="flex flex-col mb-auto space-y-1 w-full px-2 py-4">
+          {navigation.map((item) => {
+            if (!userRole || !item.allowedRoles.includes(userRole)) {
+              return null;
+            }
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  pathname === item.href
+                    ? "bg-gray-800 text-white"
+                    : "text-gray-300 hover:bg-gray-700 hover:text-white",
+                  "group flex items-center text-white rounded-md px-2 py-2 text-sm font-medium"
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    pathname === item.href
+                      ? "text-white"
+                      : "text-gray-400 group-hover:text-white",
+                    "mr-3 h-5 w-5 shrink-0"
+                  )}
+                  aria-hidden="true"
+                />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4">
+          <button
+            onClick={logout}
+            className="flex w-full items-center justify-center rounded-md bg-gray-800 px-3 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          >
+            <LogOut className="mr-2 h-5 w-5" />
+            Sign out
+          </button>
+        </div>
+      </div>
+      {isOpen && (
+        <button
+          className="inset-0 absolute w-full h-full bg-black/50"
+          onClick={toggleSidebar}
+        />
+      )}
+    </>
   );
 }

@@ -26,6 +26,17 @@ export interface Product {
     group_name: string;
     options: string[];
   }[];
+  variant_groups?: {
+    color: string;
+    sizes: string[];
+    sell_price_override?: number;
+    image_url?: string;
+  }[];
+  source_link?: string;
+  // New fields from the catalog modal
+  category?: string;
+  color?: string;
+  size?: string;
 }
 
 export interface Customer {

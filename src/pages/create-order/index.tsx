@@ -231,13 +231,10 @@ export default function CreateOrderPage() {
   return (
     <div className="p-6">
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" onClick={() => router.back()}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
         <h1 className="text-2xl font-semibold">Create New Order</h1>
       </div>
 
-      <div className="max-w-4xl">
+      <div className="w-full">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Customer Details</h2>
           <div className="grid grid-cols-2 gap-4">
