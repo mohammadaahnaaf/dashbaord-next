@@ -19,23 +19,25 @@ export default function LoginPage() {
   async function getPathaoToken() {
     try {
       setPathaoLoading(true);
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_PATHAO_BASE_URL}/aladdin/api/v1/issue-token`,
-        {
-          client_id: process.env.NEXT_PUBLIC_PATHAO_CLIENT_ID,
-          client_secret: process.env.NEXT_PUBLIC_PATHAO_CLIENT_SECRET,
-          grant_type: "password",
-          username: "anamulhoquerafi118399@gmail.com",
-          password: "Test@11",
-        }
-      );
+      const response = await axios.post("/api/pathao/issue-token", {
+        client_id: process.env.NEXT_PUBLIC_PATHAO_CLIENT_ID,
+        client_secret: process.env.NEXT_PUBLIC_PATHAO_CLIENT_SECRET,
+        grant_type: "password",
+        username: "anamulhoquerafi118399@gmail.com",
+        password: "Test@11",
+      });
       setPathaoLoading(false);
       localStorage.setItem("pathao_access_token", response.data.access_token);
       localStorage.setItem("pathao_refresh_token", response.data.refresh_token);
       alert("Pathao token generated successfully");
-    } catch (error) {
+    } catch (error: any) {
       setPathaoLoading(false);
       console.error(error);
+      alert(
+        error.response?.data?.error ||
+          error.message ||
+          "Failed to get Pathao token"
+      );
     }
   }
 
@@ -180,13 +182,11 @@ export default function LoginPage() {
           <Button
             type="button"
             onClick={getPathaoToken}
-            className="w-full !hidden"
+            className="w-full"
             size="lg"
           >
             Get Pathao Token
           </Button>
-
-      
         </form>
       </div>
     </div>
