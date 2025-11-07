@@ -37,6 +37,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   userRole: UserRole | null;
   userEmail: string | null;
+  pathaoStoreId: string | null;
+  setPathaoStoreId: (storeId: string) => void;
   login: (email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => void;
 }
@@ -45,6 +47,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userRole: null,
   userEmail: null,
+  pathaoStoreId: null,
+  setPathaoStoreId: () => {},
   login: async () => {},
   logout: () => {},
 });
@@ -98,11 +102,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return localStorage.getItem("userEmail");
   };
 
+  const getInitialPathaoStoreId = (): string | null => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("pathaoStoreId");
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthState);
   const [userRole, setUserRole] = useState<UserRole | null>(getInitialUserRole);
   const [userEmail, setUserEmail] = useState<string | null>(
     getInitialUserEmail
   );
+  const [pathaoStoreId, setPathaoStoreIdState] = useState<string | null>(
+    getInitialPathaoStoreId
+  );
+
+  const setPathaoStoreId = (storeId: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("pathaoStoreId", storeId);
+      setPathaoStoreIdState(storeId);
+    }
+  };
 
   // Handle route protection (middleware handles most of this, but keep client-side check)
   useEffect(() => {
@@ -154,10 +173,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsAuthenticated(false);
     setUserRole(null);
     setUserEmail(null);
+    setPathaoStoreIdState(null);
     // Remove both cookie and localStorage
     deleteCookie("userRole");
     localStorage.removeItem("userRole");
     localStorage.removeItem("userEmail");
+    localStorage.removeItem("pathaoStoreId");
     router.push("/");
   };
 
@@ -177,6 +198,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAuthenticated,
         userRole,
         userEmail,
+        pathaoStoreId,
+        setPathaoStoreId,
         login,
         logout,
       }}

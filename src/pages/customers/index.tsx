@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Modal } from "@/components/ui";
-import useStore from "@/store";
+import { Button, Input } from "@/components/ui";
 // import { showToast } from '@/utils';
 import { Plus, Search, ShoppingBag, Edit2, Trash2 } from "lucide-react";
 import { formatDate } from "@/components/utils";
-import { Customer } from "@/types";
+import { Customer, Order } from "@/types";
 import { CustomerModal } from "@/components/modals/CustomerModal";
+import { customersAPI, ordersAPI } from "@/utils/api-client";
 // import { CustomerModal as CustomerModalComponent } from "@/components/modals/CustomerModal";
 
 export interface CustomerEditFormData {
@@ -25,7 +25,18 @@ export default function CustomersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
-  const { customers, orders } = useStore();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const customersData = await customersAPI.getAll();
+      setCustomers(customersData);
+      const ordersData = await ordersAPI.getAll();
+      setOrders(ordersData);
+    };
+    fetchData();
+  }, []);
 
   const [formData, setFormData] = useState<CustomerEditFormData>({
     name: "",
@@ -57,7 +68,7 @@ export default function CustomersPage() {
       total_orders: 0,
     };
 
-    useStore.setState({ customers: [...customers, newCustomer] });
+    setCustomers([...customers, newCustomer]);
     alert("Customer created successfully");
     setIsCreateModalOpen(false);
     setFormData({
@@ -76,8 +87,8 @@ export default function CustomersPage() {
       return;
     }
 
-    useStore.setState({
-      customers: customers.map((customer) =>
+    setCustomers(
+      customers.map((customer) =>
         customer.id === editingCustomer.id
           ? {
               ...customer,
@@ -88,8 +99,8 @@ export default function CustomersPage() {
               updated_at: new Date().toISOString(),
             }
           : customer
-      ),
-    });
+      )
+    );
 
     alert("Customer updated successfully");
     setIsEditModalOpen(false);
@@ -108,9 +119,7 @@ export default function CustomersPage() {
       return;
     }
 
-    useStore.setState({
-      customers: customers.filter((customer) => customer.id !== customerId),
-    });
+    setCustomers(customers.filter((customer) => customer.id !== customerId));
     alert("Customer deleted successfully");
   };
 

@@ -6,6 +6,7 @@ import { UserRole } from "@/types";
 import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/contexts";
 import axios from "axios";
+import { storePathaoTokens } from "@/utils/pathao-token";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -27,8 +28,15 @@ export default function LoginPage() {
         password: "Test@11",
       });
       setPathaoLoading(false);
-      localStorage.setItem("pathao_access_token", response.data.access_token);
-      localStorage.setItem("pathao_refresh_token", response.data.refresh_token);
+
+      // Store tokens with expiry information
+      storePathaoTokens({
+        token_type: response.data.token_type || "Bearer",
+        expires_in: response.data.expires_in || 432000,
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+      });
+
       alert("Pathao token generated successfully");
     } catch (error: any) {
       setPathaoLoading(false);
@@ -52,6 +60,7 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
+      await getPathaoToken();
       await login(email, password, selectedRole);
     } catch (err: any) {
       setError(err.message || "Login failed. Please check your credentials.");
@@ -178,14 +187,6 @@ export default function LoginPage() {
             size="lg"
           >
             Sign in
-          </Button>
-          <Button
-            type="button"
-            onClick={getPathaoToken}
-            className="w-full"
-            size="lg"
-          >
-            Get Pathao Token
           </Button>
         </form>
       </div>

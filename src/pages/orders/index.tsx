@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import type { GetServerSideProps } from "next";
 import { Input, Button, StatusChip } from "@/components/ui";
-import useStore from "@/store";
+import { getOrders, getCustomers, setOrders, setCustomers, getCurrentUser } from "@/utils/local-storage";
+import { ordersAPI, customersAPI } from "@/utils/api-client";
+import { useAuth } from "@/contexts";
 import { formatDate, formatBDT } from "@/components/utils";
 import { Search, Filter } from "lucide-react";
 import OrderDrawer from "@/components/orders/OrderDrawer";
@@ -18,19 +20,29 @@ export const getServerSideProps: GetServerSideProps = async () => {
 
 export default function OrdersPage() {
   const router = useRouter();
-  const orders = useStore((state) => state.orders);
-  const customers = useStore((state) => state.customers);
-  const currentUser = useStore((state) => state.currentUser);
-  const fetchOrders = useStore((state) => state.fetchOrders);
-  const fetchCustomers = useStore((state) => state.fetchCustomers);
+  const { userRole } = useAuth();
+  const [orders, setOrdersState] = useState(getOrders());
+  const [customers, setCustomersState] = useState(getCustomers());
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewingOrderId, setViewingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchOrders();
-    fetchCustomers();
-  }, [fetchOrders, fetchCustomers]);
+    const fetchData = async () => {
+      try {
+        const ordersData = await ordersAPI.getAll();
+        setOrders(ordersData);
+        setOrdersState(ordersData);
+        
+        const customersData = await customersAPI.getAll();
+        setCustomers(customersData);
+        setCustomersState(customersData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -97,7 +109,7 @@ export default function OrdersPage() {
         <BulkActionsBar
           selectedOrders={selectedOrders}
           onClearSelection={() => setSelectedOrders([])}
-          userRole={currentUser.role}
+          userRole={userRole || "moderator"}
         />
       )}
 

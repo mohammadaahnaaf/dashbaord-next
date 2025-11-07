@@ -1,12 +1,22 @@
-import { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-require-imports */
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { Button, Input, Select } from "@/components/ui";
-import useStore from "@/store";
+import {
+  getSettings,
+  getProducts,
+  getCustomers,
+  setProducts,
+  setCustomers,
+  getEditingOrderId,
+  setEditingOrderId,
+} from "@/utils/local-storage";
+import { productsAPI, customersAPI, ordersAPI } from "@/utils/api-client";
 // import { showToast } from "@/components/utils";
-import { Product } from "@/types";
+import { Product, Customer } from "@/types";
 import { ArrowLeft, Plus, X, Search } from "lucide-react";
 import { formatBDT } from "@/components/utils";
-import { ordersAPI, customersAPI } from "@/utils/api-client";
+import { usePathaoLocations } from "@/hooks/use-pathao-locations";
 
 export interface OrderFormData {
   customer_name: string;
@@ -15,6 +25,9 @@ export interface OrderFormData {
   pathao_district?: string;
   pathao_zone?: string;
   pathao_area?: string;
+  pathao_city_id?: number;
+  pathao_zone_id?: number;
+  pathao_area_id?: number;
   delivery_type?: "inside_dhaka" | "sub_dhaka" | "outside_dhaka";
 }
 
@@ -35,18 +48,33 @@ export default function CreateOrderPage() {
   const customerPhone =
     typeof router.query.phone === "string" ? router.query.phone : undefined;
 
-  const products = useStore((state) => state.products);
-  const customers = useStore((state) => state.customers);
-  const settings = useStore((state) => state.settings);
-  const fetchProducts = useStore((state) => state.fetchProducts);
-  const fetchCustomers = useStore((state) => state.fetchCustomers);
-  const fetchOrders = useStore((state) => state.fetchOrders);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [settings, setSettings] = useState(() => {
+    const { getSettings } = require("@/utils/local-storage");
+    return getSettings();
+  });
+
+  // Pathao locations
+  const {
+    cities,
+    zones,
+    areas,
+    loading: pathaoLoading,
+    error: pathaoError,
+    fetchZones,
+    fetchAreas,
+  } = usePathaoLocations();
 
   const [selectedProducts, setSelectedProducts] = useState<OrderItemForm[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState(0);
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("");
+
+  // Customer autocomplete
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const customerInputRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<OrderFormData>({
     customer_name: "",
@@ -56,9 +84,25 @@ export default function CreateOrderPage() {
   });
 
   useEffect(() => {
-    fetchProducts();
-    fetchCustomers();
-  }, [fetchProducts, fetchCustomers]);
+    const fetchData = async () => {
+      try {
+        const productsData = await productsAPI.getAll();
+        setProducts(productsData);
+        setProducts(productsData);
+
+        const customersData = await customersAPI.getAll();
+        setCustomers(customersData);
+        setCustomers(customersData);
+
+        // Load settings from localStorage
+        const currentSettings = getSettings();
+        setSettings(currentSettings);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Debug: Log products when they're loaded
   useEffect(() => {
@@ -82,6 +126,47 @@ export default function CreateOrderPage() {
     }
   }, [products]);
 
+  // Load editing order if exists
+  useEffect(() => {
+    const editingOrderId = getEditingOrderId();
+    if (editingOrderId && customers.length > 0) {
+      // Load order data for editing
+      ordersAPI
+        .getById(editingOrderId)
+        .then((order) => {
+          // Set form data from order
+          const customer = customers.find((c) => c.id === order.customer_id);
+          if (customer) {
+            setFormData({
+              customer_name: customer.name,
+              customer_phone: customer.phone,
+              delivery_address: order.address,
+              delivery_type: "inside_dhaka",
+              pathao_city_id: undefined,
+              pathao_zone_id: undefined,
+              pathao_area_id: undefined,
+            });
+          }
+          // Set selected products from order items
+          const orderItems: OrderItemForm[] = order.items.map((item) => ({
+            product_id: item.product_id,
+            product_name_snapshot: item.product_name_snapshot,
+            image_url_snapshot: item.image_url_snapshot,
+            qty: item.qty,
+            quantity: item.quantity || item.qty,
+            sell_price_bdt_snapshot: item.sell_price_bdt_snapshot,
+            price: item.price || item.sell_price_bdt_snapshot,
+            color_snapshot: item.color_snapshot,
+            size_snapshot: item.size_snapshot,
+          }));
+          setSelectedProducts(orderItems);
+          setAdvanceAmount(order.advance_bdt);
+          setEditingOrderId(null); // Clear after loading
+        })
+        .catch(console.error);
+    }
+  }, [customers]);
+
   useEffect(() => {
     if (customerPhone) {
       const customer = customers.find((c) => c.phone === customerPhone);
@@ -96,6 +181,48 @@ export default function CreateOrderPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerPhone, customers]);
+
+  // Filter customers for autocomplete
+  const filteredCustomers = customers.filter((customer) =>
+    customer.name.toLowerCase().includes(formData.customer_name.toLowerCase())
+  );
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        customerInputRef.current &&
+        !customerInputRef.current.contains(event.target as Node)
+      ) {
+        setShowCustomerSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Show suggestions when typing
+  useEffect(() => {
+    if (formData.customer_name.length > 0 && filteredCustomers.length > 0) {
+      setShowCustomerSuggestions(true);
+    } else {
+      setShowCustomerSuggestions(false);
+    }
+  }, [formData.customer_name, filteredCustomers.length]);
+
+  // Handle customer selection from suggestions
+  const handleCustomerSelect = (customer: (typeof customers)[0]) => {
+    setFormData({
+      ...formData,
+      customer_name: customer.name,
+      customer_phone: customer.phone,
+      delivery_address: customer.address || "",
+    });
+    setShowCustomerSuggestions(false);
+  };
 
   const handleAddProduct = () => {
     setSelectedProducts((prev) => [
@@ -362,7 +489,10 @@ export default function CreateOrderPage() {
           email: "",
           address: formData.delivery_address,
         });
-        await fetchCustomers();
+        // Refresh customers
+        const updatedCustomers = await customersAPI.getAll();
+        setCustomers(updatedCustomers);
+        setCustomers(updatedCustomers);
       }
 
       const { deliveryCharge } = calculateTotals();
@@ -396,7 +526,6 @@ export default function CreateOrderPage() {
       });
 
       alert("Order created successfully");
-      await fetchOrders();
       router.push("/orders");
     } catch (error: unknown) {
       console.error("Error creating order:", error);
@@ -433,17 +562,46 @@ export default function CreateOrderPage() {
             <h2 className="text-lg font-semibold mb-4">Customer & Delivery</h2>
 
             <div className="space-y-4">
-              <Input
-                label="Customer Name"
-                value={formData.customer_name}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    customer_name: e.target.value,
-                  }))
-                }
-                required
-              />
+              <div ref={customerInputRef} className="relative">
+                <Input
+                  label="Customer Name"
+                  value={formData.customer_name}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      customer_name: e.target.value,
+                    }))
+                  }
+                  onFocus={() => {
+                    if (
+                      formData.customer_name.length > 0 &&
+                      filteredCustomers.length > 0
+                    ) {
+                      setShowCustomerSuggestions(true);
+                    }
+                  }}
+                  required
+                />
+                {showCustomerSuggestions && filteredCustomers.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredCustomers.slice(0, 10).map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-medium text-gray-900">
+                          {customer.name}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {customer.phone}
+                          {customer.address && ` • ${customer.address}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <Input
                 label="Phone"
@@ -480,62 +638,112 @@ export default function CreateOrderPage() {
               <h3 className="text-sm font-semibold text-gray-800 mb-3">
                 Pathao Location
               </h3>
+              {pathaoError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    {pathaoError}. Please ensure you have generated a Pathao
+                    token.
+                  </p>
+                </div>
+              )}
               <div className="space-y-4">
                 <Select
-                  label="District"
-                  value={formData.pathao_district || ""}
-                  onChange={(e) =>
+                  label="City"
+                  value={formData.pathao_city_id?.toString() || ""}
+                  onChange={(e) => {
+                    const cityId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedCity = cities.find(
+                      (c) => c.city_id === cityId
+                    );
                     setFormData((prev) => ({
                       ...prev,
-                      pathao_district: e.target.value,
-                    }))
-                  }
+                      pathao_city_id: cityId,
+                      pathao_district: selectedCity?.city_name || undefined,
+                      pathao_zone_id: undefined,
+                      pathao_zone: undefined,
+                      pathao_area_id: undefined,
+                      pathao_area: undefined,
+                    }));
+                    if (cityId) {
+                      fetchZones(cityId);
+                    }
+                  }}
                   options={[
-                    { value: "", label: "Select District" },
-                    { value: "Dhaka", label: "Dhaka" },
-                    { value: "Chittagong", label: "Chittagong" },
-                    { value: "Sylhet", label: "Sylhet" },
+                    {
+                      value: "",
+                      label: pathaoLoading
+                        ? "Loading cities..."
+                        : "Select City",
+                    },
+                    ...cities.map((city) => ({
+                      value: city.city_id.toString(),
+                      label: city.city_name.trim(),
+                    })),
                   ]}
+                  disabled={pathaoLoading}
                 />
                 <Select
                   label="Zone"
-                  value={formData.pathao_zone || ""}
-                  onChange={(e) =>
+                  value={formData.pathao_zone_id?.toString() || ""}
+                  onChange={(e) => {
+                    const zoneId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedZone = zones.find(
+                      (z) => z.zone_id === zoneId
+                    );
                     setFormData((prev) => ({
                       ...prev,
-                      pathao_zone: e.target.value,
-                    }))
-                  }
+                      pathao_zone_id: zoneId,
+                      pathao_zone: selectedZone?.zone_name || undefined,
+                      pathao_area_id: undefined,
+                      pathao_area: undefined,
+                    }));
+                    if (zoneId) {
+                      fetchAreas(zoneId);
+                    }
+                  }}
                   options={[
-                    { value: "", label: "Select Zone" },
-                    ...(formData.pathao_district === "Dhaka"
-                      ? [
-                          { value: "Mirpur", label: "Mirpur" },
-                          { value: "Dhanmondi", label: "Dhanmondi" },
-                          { value: "Gulshan", label: "Gulshan" },
-                        ]
-                      : []),
+                    {
+                      value: "",
+                      label: pathaoLoading ? "Loading zones..." : "Select Zone",
+                    },
+                    ...zones.map((zone) => ({
+                      value: zone.zone_id.toString(),
+                      label: zone.zone_name.trim(),
+                    })),
                   ]}
+                  disabled={!formData.pathao_city_id || pathaoLoading}
                 />
                 <Select
                   label="Area"
-                  value={formData.pathao_area || ""}
-                  onChange={(e) =>
+                  value={formData.pathao_area_id?.toString() || ""}
+                  onChange={(e) => {
+                    const areaId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedArea = areas.find(
+                      (a) => a.area_id === areaId
+                    );
                     setFormData((prev) => ({
                       ...prev,
-                      pathao_area: e.target.value,
-                    }))
-                  }
+                      pathao_area_id: areaId,
+                      pathao_area: selectedArea?.area_name || undefined,
+                    }));
+                  }}
                   options={[
-                    { value: "", label: "Select Area" },
-                    ...(formData.pathao_zone === "Mirpur"
-                      ? [
-                          { value: "Mirpur 10", label: "Mirpur 10" },
-                          { value: "Mirpur 11", label: "Mirpur 11" },
-                          { value: "Mirpur 12", label: "Mirpur 12" },
-                        ]
-                      : []),
+                    {
+                      value: "",
+                      label: pathaoLoading ? "Loading areas..." : "Select Area",
+                    },
+                    ...areas.map((area) => ({
+                      value: area.area_id.toString(),
+                      label: area.area_name.trim(),
+                    })),
                   ]}
+                  disabled={!formData.pathao_zone_id || pathaoLoading}
                 />
               </div>
             </div>
