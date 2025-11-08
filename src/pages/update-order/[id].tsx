@@ -2,16 +2,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { Button, Input, Select } from "@/components/ui";
-import {
-  getSettings,
-  getProducts,
-  getCustomers,
-  setProducts,
-  setCustomers,
-} from "@/utils/local-storage";
+import { getSettings } from "@/utils/local-storage";
 import { productsAPI, customersAPI, ordersAPI } from "@/utils/api-client";
 import { Product, Customer, Order } from "@/types";
-import { ArrowLeft, Plus, X, Search, Copy, Check } from "lucide-react";
+import { Plus, X, Copy, Check } from "lucide-react";
 import { formatBDT, showToast, copyToClipboard } from "@/components/utils";
 import { usePathaoLocations } from "@/hooks/use-pathao-locations";
 import Image from "next/image";
@@ -123,8 +117,6 @@ export default function UpdateOrderPage() {
           if (customer) {
             // Determine delivery type from delivery charge
             const deliveryCharge = orderData.delivery_charge_bdt || 0;
-            const insideDhakaCharge =
-              settings.deliveryCharges.inside_dhaka || 60;
             const outsideDhakaCharge =
               settings.deliveryCharges.outside_dhaka || 120;
             let deliveryType: "inside_dhaka" | "sub_dhaka" | "outside_dhaka" =
@@ -178,10 +170,17 @@ export default function UpdateOrderPage() {
             }));
             setSelectedProducts(orderItems);
             setAdvanceAmount(orderData.advance_bdt || 0);
+
+            // Set estimated delivery date if exists
+            if (orderData.estimated_delivery_date) {
+              const date = new Date(orderData.estimated_delivery_date);
+              const formattedDate = date.toISOString().split("T")[0];
+              setEstimatedDeliveryDate(formattedDate);
+            }
           }
         }
-      } catch (error) {
-        console.error("Error loading initial data:", error);
+      } catch (err) {
+        console.error("Error loading initial data:", err);
         alert("Failed to load order data. Please try again.");
         router.push("/orders");
       } finally {
@@ -193,7 +192,15 @@ export default function UpdateOrderPage() {
     if (cities.length > 0 || pathaoError) {
       loadInitialData();
     }
-  }, [orderId, cities.length, pathaoError, fetchZones]);
+  }, [
+    orderId,
+    cities,
+    pathaoError,
+    fetchZones,
+    router,
+    settings.deliveryCharges.inside_dhaka,
+    settings.deliveryCharges.outside_dhaka,
+  ]);
 
   // Update form data when zones are loaded for the order's city
   useEffect(() => {
@@ -278,8 +285,8 @@ export default function UpdateOrderPage() {
             setPathaoOrderInfo(data.data);
           }
         }
-      } catch (error) {
-        console.error("Error fetching Pathao order info:", error);
+      } catch (err) {
+        console.error("Error fetching Pathao order info:", err);
       } finally {
         setIsLoadingPathaoInfo(false);
       }
@@ -296,7 +303,7 @@ export default function UpdateOrderPage() {
       setIsCopiedPathaoTracking(true);
       showToast("Pathao tracking link copied to clipboard!", "success");
       setTimeout(() => setIsCopiedPathaoTracking(false), 2000);
-    } catch (error) {
+    } catch {
       showToast("Failed to copy link", "error");
     }
   };
@@ -451,8 +458,8 @@ export default function UpdateOrderPage() {
           pathaoResponse.message || "Failed to create order in Pathao"
         );
       }
-    } catch (error) {
-      console.error("Error sending order to Pathao:", error);
+    } catch (err) {
+      console.error("Error sending order to Pathao:", err);
     } finally {
       setIsSendingToPathao(false);
     }
@@ -626,6 +633,7 @@ export default function UpdateOrderPage() {
         address: formData.delivery_address,
         delivery_charge_bdt: deliveryCharge,
         advance_bdt: advanceAmount,
+        estimated_delivery_date: estimatedDeliveryDate || undefined,
         pathao_city_name:
           selectedCity?.city_name || formData.pathao_district || undefined,
         pathao_zone_name:
@@ -641,10 +649,10 @@ export default function UpdateOrderPage() {
 
       alert("Order updated successfully");
       router.push("/orders");
-    } catch (error) {
-      console.error("Error updating order:", error);
+    } catch (err) {
+      console.error("Error updating order:", err);
       alert(
-        (error as Error).message || "Failed to update order. Please try again."
+        (err as Error).message || "Failed to update order. Please try again."
       );
     } finally {
       setIsSaving(false);
@@ -963,7 +971,7 @@ export default function UpdateOrderPage() {
               <div className="flex gap-2 items-center">
                 <Select
                   id="product-select"
-                  className="!w-full"
+                  className="w-full!"
                   options={[
                     { value: "", label: "Select Product" },
                     ...products.map((product) => ({
@@ -991,9 +999,9 @@ export default function UpdateOrderPage() {
                     alt={item.product_name_snapshot}
                     width={48}
                     height={48}
-                    className="w-12 h-12 rounded-md object-cover flex-shrink-0"
+                    className="w-12 h-12 rounded-md object-cover shrink-0"
                   />
-                  <div className="flex-grow min-w-0">
+                  <div className="grow min-w-0">
                     <p className="font-medium text-gray-900 truncate">
                       {item.product_name_snapshot}
                     </p>

@@ -1,6 +1,74 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/db";
 
+// Helper function to check product variant quantity availability
+async function validateItemQuantity(
+  productId: number,
+  color: string | null | undefined,
+  size: string | null | undefined,
+  requestedQty: number
+): Promise<{ available: boolean; availableQty: number; error?: string }> {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: { variantGroups: true },
+    });
+
+    if (!product) {
+      return { available: false, availableQty: 0, error: "Product not found" };
+    }
+
+    // If no color or size specified, we can't validate (legacy products)
+    if (!color || !size) {
+      return { available: true, availableQty: 9999 }; // Allow legacy products
+    }
+
+    // Find the variant group that matches the color
+    const variantGroup = product.variantGroups.find(
+      (vg) => vg.color.toLowerCase() === color.toLowerCase()
+    );
+
+    if (!variantGroup) {
+      return {
+        available: false,
+        availableQty: 0,
+        error: `Color '${color}' not found for product`,
+      };
+    }
+
+    // Check if size exists in the variant group
+    if (!variantGroup.sizes.includes(size)) {
+      return {
+        available: false,
+        availableQty: 0,
+        error: `Size '${size}' not available for color '${color}'`,
+      };
+    }
+
+    // Get the available quantity for this size
+    const quantities =
+      (variantGroup?.quantities as unknown as Record<string, number>) || {};
+    const availableQty = quantities?.[size] || 0;
+
+    if (requestedQty > availableQty) {
+      return {
+        available: false,
+        availableQty,
+        error: `Only ${availableQty} items available for ${product.name} (${color}, ${size})`,
+      };
+    }
+
+    return { available: true, availableQty };
+  } catch (error) {
+    console.error("Error validating quantity:", error);
+    return {
+      available: false,
+      availableQty: 0,
+      error: "Error checking availability",
+    };
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -85,6 +153,7 @@ async function getOrder(req: NextApiRequest, res: NextApiResponse, id: number) {
       pathao_tracking_code: order.pathaoTrackingCode || null,
       pathao_status: order.pathaoStatus || null,
       last_synced_at: order.lastSyncedAt || null,
+      estimated_delivery_date: order.estimatedDeliveryDate || null,
       total_amount: parseFloat(order.totalAmount.toString()),
       total_items: order.totalItems,
       delivery_charge: parseFloat(order.deliveryChargeBdt.toString()),
@@ -112,6 +181,7 @@ async function updateOrder(
     address,
     delivery_charge_bdt,
     advance_bdt,
+    estimated_delivery_date,
     pathao_city_name,
     pathao_zone_name,
     pathao_area_name,
@@ -132,6 +202,26 @@ async function updateOrder(
 
     if (!existingOrder) {
       return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Validate quantity availability if items are being updated
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        const validation = await validateItemQuantity(
+          item.product_id,
+          item.color_snapshot,
+          item.size_snapshot,
+          item.qty || item.quantity || 0
+        );
+
+        if (!validation.available) {
+          return res.status(400).json({
+            error: validation.error || "Insufficient quantity",
+            product_id: item.product_id,
+            available_quantity: validation.availableQty,
+          });
+        }
+      }
     }
 
     // Use transaction for updates
@@ -234,6 +324,11 @@ async function updateOrder(
           deliveryChargeBdt: deliveryCharge,
           advanceBdt: advance,
           dueBdt: dueBdt,
+          ...(estimated_delivery_date !== undefined && {
+            estimatedDeliveryDate: estimated_delivery_date
+              ? new Date(estimated_delivery_date)
+              : null,
+          }),
           ...(pathao_city_name !== undefined && {
             pathaoCityName: pathao_city_name?.trim() || null,
           }),
@@ -302,6 +397,7 @@ async function updateOrder(
       pathao_tracking_code: result.pathaoTrackingCode || null,
       pathao_status: result.pathaoStatus || null,
       last_synced_at: result.lastSyncedAt || null,
+      estimated_delivery_date: result.estimatedDeliveryDate || null,
       total_amount: parseFloat(result.totalAmount.toString()),
       total_items: result.totalItems,
       delivery_charge: parseFloat(result.deliveryChargeBdt.toString()),

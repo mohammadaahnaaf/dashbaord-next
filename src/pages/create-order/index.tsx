@@ -2,15 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { Button, Input, Select } from "@/components/ui";
-import {
-  getSettings,
-  getProducts,
-  getCustomers,
-  setProducts,
-  setCustomers,
-  getEditingOrderId,
-  setEditingOrderId,
-} from "@/utils/local-storage";
+import { getSettings } from "@/utils/local-storage";
 import { productsAPI, customersAPI, ordersAPI } from "@/utils/api-client";
 // import { showToast } from "@/components/utils";
 import { Product, Customer } from "@/types";
@@ -128,7 +120,7 @@ export default function CreateOrderPage() {
 
   // Load editing order if exists
   useEffect(() => {
-    const editingOrderId = getEditingOrderId();
+    const editingOrderId = null; // Removed: use /update-order/[id] page instead
     if (editingOrderId && customers.length > 0 && cities.length > 0) {
       // Load order data for editing
       const loadOrderForEditing = async () => {
@@ -225,7 +217,7 @@ export default function CreateOrderPage() {
           }));
           setSelectedProducts(orderItems);
           setAdvanceAmount(order.advance_bdt);
-          setEditingOrderId(null); // Clear after loading
+          // Removed: setEditingOrderId(null)
         } catch (error) {
           console.error("Error loading order for editing:", error);
         }
@@ -233,8 +225,7 @@ export default function CreateOrderPage() {
 
       loadOrderForEditing();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers, cities]);
+  }, [customers, cities, zones, areas, fetchZones, fetchAreas]);
 
   useEffect(() => {
     if (customerPhone) {
@@ -587,6 +578,7 @@ export default function CreateOrderPage() {
         address: formData.delivery_address,
         delivery_charge_bdt: deliveryCharge,
         advance_bdt: advanceAmount,
+        estimated_delivery_date: estimatedDeliveryDate || undefined,
         pathao_city_name: formData.pathao_district || undefined,
         pathao_zone_name: formData.pathao_zone || undefined,
         pathao_area_name: formData.pathao_area || undefined,

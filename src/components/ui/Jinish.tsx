@@ -241,7 +241,6 @@ export function Input({ label, error, className, icon, ref, ...props }: InputPro
         )}
         <input
           ref={ref}
-         
           className={cn(
             "block w-full px-4 py-3 text-base border !border-gray-200 rounded-xl transition-all duration-200",
             "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",

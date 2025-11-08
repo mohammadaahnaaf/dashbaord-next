@@ -1,6 +1,76 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/db";
 
+// Helper function to check product variant quantity availability
+async function validateItemQuantity(
+  productId: number,
+  color: string | null | undefined,
+  size: string | null | undefined,
+  requestedQty: number
+): Promise<{ available: boolean; availableQty: number; error?: string }> {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: { variantGroups: true },
+    });
+
+    if (!product) {
+      return { available: false, availableQty: 0, error: "Product not found" };
+    }
+
+    // If no color or size specified, we can't validate (legacy products)
+    if (!color || !size) {
+      return { available: true, availableQty: 9999 }; // Allow legacy products
+    }
+
+    // Find the variant group that matches the color
+    const variantGroup = product.variantGroups.find(
+      (vg) => vg.color.toLowerCase() === color.toLowerCase()
+    );
+
+    if (!variantGroup) {
+      return {
+        available: false,
+        availableQty: 0,
+        error: `Color '${color}' not found for product`,
+      };
+    }
+
+    // Check if size exists in the variant group
+    if (!variantGroup.sizes.includes(size)) {
+      return {
+        available: false,
+        availableQty: 0,
+        error: `Size '${size}' not available for color '${color}'`,
+      };
+    }
+
+    // Get the available quantity for this size
+    const quantities = (variantGroup.quantities || {}) as Record<
+      string,
+      number
+    >;
+    const availableQty = quantities[size] || 0;
+
+    if (requestedQty > availableQty) {
+      return {
+        available: false,
+        availableQty,
+        error: `Only ${availableQty} items available for ${product.name} (${color}, ${size})`,
+      };
+    }
+
+    return { available: true, availableQty };
+  } catch (error) {
+    console.error("Error validating quantity:", error);
+    return {
+      available: false,
+      availableQty: 0,
+      error: "Error checking availability",
+    };
+  }
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -74,6 +144,7 @@ async function getOrders(req: NextApiRequest, res: NextApiResponse) {
       pathao_tracking_code: order.pathaoTrackingCode || null,
       pathao_status: order.pathaoStatus || null,
       last_synced_at: order.lastSyncedAt || null,
+      estimated_delivery_date: order.estimatedDeliveryDate || null,
       total_amount: parseFloat(order.totalAmount.toString()),
       total_items: order.totalItems,
       delivery_charge: parseFloat(order.deliveryChargeBdt.toString()),
@@ -101,6 +172,7 @@ async function createOrder(req: NextApiRequest, res: NextApiResponse) {
     address,
     delivery_charge_bdt = 0,
     advance_bdt = 0,
+    estimated_delivery_date,
     pathao_city_name,
     pathao_zone_name,
     pathao_area_name,
@@ -126,6 +198,24 @@ async function createOrder(req: NextApiRequest, res: NextApiResponse) {
     if (!item.product_id || !item.product_name_snapshot || !item.qty) {
       return res.status(400).json({
         error: "Each item must have product_id, product_name_snapshot, and qty",
+      });
+    }
+  }
+
+  // Validate quantity availability for each item
+  for (const item of items) {
+    const validation = await validateItemQuantity(
+      item.product_id,
+      item.color_snapshot,
+      item.size_snapshot,
+      item.qty || item.quantity || 0
+    );
+
+    if (!validation.available) {
+      return res.status(400).json({
+        error: validation.error || "Insufficient quantity",
+        product_id: item.product_id,
+        available_quantity: validation.availableQty,
       });
     }
   }
@@ -159,6 +249,9 @@ async function createOrder(req: NextApiRequest, res: NextApiResponse) {
           deliveryChargeBdt: deliveryCharge,
           advanceBdt: advance,
           dueBdt: dueBdt,
+          ...(estimated_delivery_date && {
+            estimatedDeliveryDate: new Date(estimated_delivery_date),
+          }),
           pathaoCityName: pathao_city_name?.trim() || null,
           pathaoZoneName: pathao_zone_name?.trim() || null,
           pathaoAreaName: pathao_area_name?.trim() || null,
@@ -216,20 +309,51 @@ async function createOrder(req: NextApiRequest, res: NextApiResponse) {
     });
 
     // Format response
+    interface CustomerInfo {
+      name: string;
+      phone: string;
+      address: string | null;
+      city: string | null;
+      zone: string | null;
+      area: string | null;
+      postalCode: string | null;
+      country: string | null;
+      email: string | null;
+      website: string | null;
+    }
+
+    interface OrderItemInfo {
+      id: number;
+      productId: number;
+      productNameSnapshot: string;
+      imageUrlSnapshot: string | null;
+      colorSnapshot: string | null;
+      sizeSnapshot: string | null;
+      qty: number;
+      sellPriceBdtSnapshot: { toString: () => string };
+      price: { toString: () => string };
+      quantity: number;
+    }
+
+    const resultWithIncludes = result as typeof result & {
+      customer: CustomerInfo;
+      orderItems: OrderItemInfo[];
+    };
+
     return res.status(201).json({
-      id: result.id,
-      customer_id: result.customerId,
-      customer_name: result.customer.name,
-      customer_phone: result.customer.phone,
-      customer_address: result.customer.address || "",
-      customer_city: result.customer.city || "",
-      customer_zone: result.customer.zone || "",
-      customer_area: result.customer.area || "",
-      customer_postal_code: result.customer.postalCode || "",
-      customer_country: result.customer.country || "",
-      customer_email: result.customer.email || "",
-      customer_website: result.customer.website || "",
-      items: result.orderItems.map((item) => ({
+      id: resultWithIncludes.id,
+      customer_id: resultWithIncludes.customerId,
+      customer_name: resultWithIncludes.customer.name,
+      customer_phone: resultWithIncludes.customer.phone,
+      customer_address: resultWithIncludes.customer.address || "",
+      customer_city: resultWithIncludes.customer.city || "",
+      customer_zone: resultWithIncludes.customer.zone || "",
+      customer_area: resultWithIncludes.customer.area || "",
+      customer_postal_code: resultWithIncludes.customer.postalCode || "",
+      customer_country: resultWithIncludes.customer.country || "",
+      customer_email: resultWithIncludes.customer.email || "",
+      customer_website: resultWithIncludes.customer.website || "",
+      items: resultWithIncludes.orderItems.map((item: OrderItemInfo) => ({
         id: item.id,
         product_id: item.productId,
         product_name_snapshot: item.productNameSnapshot,

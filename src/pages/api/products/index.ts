@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 interface VariantGroupInput {
   color?: string;
   sizes?: string[];
+  quantities?: Record<string, number>; // Map of size to quantity
   sell_price_override?: number;
   image_url?: string;
 }
@@ -56,6 +57,7 @@ async function getProducts(req: NextApiRequest, res: NextApiResponse) {
         id: vg.id,
         color: vg.color,
         sizes: vg.sizes || [],
+        quantities: (vg.quantities as Record<string, number>) || {},
         sell_price_override: vg.sellPriceOverride
           ? parseFloat(vg.sellPriceOverride.toString())
           : null,
@@ -119,6 +121,16 @@ async function createProduct(req: NextApiRequest, res: NextApiResponse) {
           .status(400)
           .json({ error: "Variant group sizes must be an array" });
       }
+      // Validate quantities for each size
+      if (vg.quantities) {
+        for (const size of vg.sizes) {
+          if (!(size in vg.quantities) || typeof vg.quantities[size] !== 'number' || vg.quantities[size] < 0) {
+            return res
+              .status(400)
+              .json({ error: `Quantity for size ${size} must be a non-negative number` });
+          }
+        }
+      }
     }
   }
 
@@ -140,6 +152,7 @@ async function createProduct(req: NextApiRequest, res: NextApiResponse) {
                 create: (variant_groups as VariantGroupInput[]).map((vg) => ({
                   color: vg.color?.trim() || "",
                   sizes: Array.isArray(vg.sizes) ? vg.sizes : [],
+                  quantities: vg.quantities || {},
                   sellPriceOverride: vg.sell_price_override
                     ? parseFloat(vg.sell_price_override.toString())
                     : null,
@@ -167,6 +180,7 @@ async function createProduct(req: NextApiRequest, res: NextApiResponse) {
         id: vg.id,
         color: vg.color,
         sizes: vg.sizes || [],
+        quantities: (vg.quantities as Record<string, number>) || {},
         sell_price_override: vg.sellPriceOverride
           ? parseFloat(vg.sellPriceOverride.toString())
           : null,

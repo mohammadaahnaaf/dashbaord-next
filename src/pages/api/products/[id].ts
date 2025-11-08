@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 interface VariantGroupInput {
   color?: string;
   sizes?: string[];
+  quantities?: Record<string, number>; // Map of size to quantity
   sell_price_override?: number;
   image_url?: string;
 }
@@ -70,6 +71,7 @@ async function getProduct(
         id: vg.id,
         color: vg.color,
         sizes: vg.sizes || [],
+        quantities: (vg.quantities as Record<string, number>) || {},
         sell_price_override: vg.sellPriceOverride
           ? parseFloat(vg.sellPriceOverride.toString())
           : null,
@@ -141,6 +143,7 @@ async function updateProduct(
             create: (variant_groups as VariantGroupInput[]).map((vg) => ({
               color: vg.color?.trim() || "",
               sizes: Array.isArray(vg.sizes) ? vg.sizes : [],
+              quantities: vg.quantities || {},
               sellPriceOverride: vg.sell_price_override
                 ? parseFloat(vg.sell_price_override.toString())
                 : null,
@@ -168,6 +171,7 @@ async function updateProduct(
         id: vg.id,
         color: vg.color,
         sizes: vg.sizes || [],
+        quantities: (vg.quantities as Record<string, number>) || {},
         sell_price_override: vg.sellPriceOverride
           ? parseFloat(vg.sellPriceOverride.toString())
           : null,

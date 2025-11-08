@@ -27,8 +27,10 @@ export interface Product {
     options: string[];
   }[];
   variant_groups?: {
+    id?: number;
     color: string;
     sizes: string[];
+    quantities?: Record<string, number>; // Map of size to quantity
     sell_price_override?: number;
     image_url?: string;
   }[];
@@ -77,6 +79,7 @@ export interface Order {
   delivery_charge_bdt: number;
   advance_bdt: number;
   due_bdt: number;
+  estimated_delivery_date?: string;
   pathao_city_name: string;
   pathao_zone_name: string;
   pathao_area_name: string;
