@@ -147,10 +147,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
   };
 
   const handleEditOrder = () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { setEditingOrderId } = require("@/utils/local-storage");
-    setEditingOrderId(order.id);
-    router.push("/create-order");
+    router.push(`/update-order/${order.id}`);
     onClose();
   };
 
@@ -362,7 +359,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
             </div>
 
             {/* Tracking Link */}
-            <div className="bg-gray-50 p-3 rounded-lg mb-6">
+            <div className="bg-gray-50 hidden p-3 rounded-lg mb-6">
               <h3 className="font-semibold text-gray-800 mb-2">
                 Customer Tracking Link
               </h3>

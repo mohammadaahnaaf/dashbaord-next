@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import type { GetServerSideProps } from "next";
 import { Input, Button, StatusChip } from "@/components/ui";
-import { getOrders, getCustomers, setOrders, setCustomers, getCurrentUser } from "@/utils/local-storage";
+import { getOrders, getCustomers, setOrders, setCustomers } from "@/utils/local-storage";
 import { ordersAPI, customersAPI } from "@/utils/api-client";
 import { useAuth } from "@/contexts";
 import { formatDate, formatBDT } from "@/components/utils";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, Trash2 } from "lucide-react";
 import OrderDrawer from "@/components/orders/OrderDrawer";
 import BulkActionsBar from "@/components/orders/BulkActionsBar";
 import { Customer, Order } from "@/types";
@@ -74,6 +74,37 @@ export default function OrdersPage() {
       `${order.id} ${customer?.name} ${customer?.phone} ${order.status}`.toLowerCase();
     return searchString.includes(searchTerm.toLowerCase());
   });
+
+  const handleDeleteOrder = async (orderId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
+    if (!confirm("Are you sure you want to delete this order?")) {
+      return;
+    }
+
+    try {
+      await ordersAPI.delete(orderId);
+      // showToast("Order deleted successfully", "success");
+      
+      // Refresh orders
+      const updatedOrders = await ordersAPI.getAll();
+      setOrders(updatedOrders);
+      setOrdersState(updatedOrders);
+      
+      // Remove from selected if it was selected
+      setSelectedOrders((prev) => prev.filter((id) => id !== orderId));
+      
+      // Close drawer if this order was being viewed
+      if (viewingOrderId === orderId) {
+        setViewingOrderId(null);
+      }
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      // showToast(
+      //   error.message || "Failed to delete order. Please try again.",
+      //   "error"
+      // );
+    }
+  };
 
   return (
     <div className="p-6">
@@ -207,6 +238,16 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {formatDate(order.created_at)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleDeleteOrder(order.id, e)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </td>
                 </tr>
               );

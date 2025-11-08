@@ -79,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       storedEmail
     ) {
       // Sync cookie with localStorage (for server-side middleware compatibility)
-      const cookieRole = getCookie("userRole");
+    const cookieRole = getCookie("userRole");
       if (!cookieRole) {
         setCookie("userRole", storedRole);
       }
@@ -150,14 +150,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem("userEmail", response.user.email);
 
         // Update state
-        setIsAuthenticated(true);
+    setIsAuthenticated(true);
         setUserRole(response.user.role as UserRole);
         setUserEmail(response.user.email);
 
         // Set cookie for middleware compatibility
         setCookie("userRole", response.user.role);
 
-        router.push("/orders");
+    router.push("/orders");
       } else {
         throw new Error("Login failed");
       }

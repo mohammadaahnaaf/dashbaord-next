@@ -129,24 +129,88 @@ export default function CreateOrderPage() {
   // Load editing order if exists
   useEffect(() => {
     const editingOrderId = getEditingOrderId();
-    if (editingOrderId && customers.length > 0) {
+    if (editingOrderId && customers.length > 0 && cities.length > 0) {
       // Load order data for editing
-      ordersAPI
-        .getById(editingOrderId)
-        .then((order) => {
-          // Set form data from order
+      const loadOrderForEditing = async () => {
+        try {
+          const order = await ordersAPI.getById(editingOrderId);
           const customer = customers.find((c) => c.id === order.customer_id);
-          if (customer) {
-            setFormData({
-              customer_name: customer.name,
-              customer_phone: customer.phone,
-              delivery_address: order.address,
-              delivery_type: "inside_dhaka",
-              pathao_city_id: undefined,
-              pathao_zone_id: undefined,
-              pathao_area_id: undefined,
-            });
+
+          if (!customer) return;
+
+          // Set basic form data first
+          const baseFormData = {
+            customer_name: customer.name,
+            customer_phone: customer.phone,
+            delivery_address: order.address,
+            delivery_type: "inside_dhaka" as const,
+            pathao_city_id: undefined as number | undefined,
+            pathao_zone_id: undefined as number | undefined,
+            pathao_area_id: undefined as number | undefined,
+            pathao_district: order.pathao_city_name || undefined,
+            pathao_zone: order.pathao_zone_name || undefined,
+            pathao_area: order.pathao_area_name || undefined,
+          };
+
+          // If order has Pathao location names, find and set IDs
+          if (order.pathao_city_name) {
+            // Find city ID from city name
+            const foundCity = cities.find(
+              (c) => c.city_name.trim() === order.pathao_city_name?.trim()
+            );
+
+            if (foundCity) {
+              baseFormData.pathao_city_id = foundCity.city_id;
+
+              // Fetch zones for this city
+              await fetchZones(foundCity.city_id);
+
+              // Wait a bit for zones to load, then find zone ID
+              setTimeout(async () => {
+                if (order.pathao_zone_name) {
+                  const foundZone = zones.find(
+                    (z) => z.zone_name.trim() === order.pathao_zone_name?.trim()
+                  );
+
+                  if (foundZone) {
+                    baseFormData.pathao_zone_id = foundZone.zone_id;
+
+                    // Fetch areas for this zone
+                    await fetchAreas(foundZone.zone_id);
+
+                    // Wait a bit for areas to load, then find area ID
+                    setTimeout(() => {
+                      if (order.pathao_area_name) {
+                        const foundArea = areas.find(
+                          (a) =>
+                            a.area_name.trim() ===
+                            order.pathao_area_name?.trim()
+                        );
+
+                        if (foundArea) {
+                          baseFormData.pathao_area_id = foundArea.area_id;
+                        }
+                      }
+
+                      // Update form data with all IDs
+                      setFormData(baseFormData);
+                    }, 500);
+                  } else {
+                    setFormData(baseFormData);
+                  }
+                } else {
+                  setFormData(baseFormData);
+                }
+              }, 500);
+            } else {
+              // City not found, just set names
+              setFormData(baseFormData);
+            }
+          } else {
+            // No Pathao location data
+            setFormData(baseFormData);
           }
+
           // Set selected products from order items
           const orderItems: OrderItemForm[] = order.items.map((item) => ({
             product_id: item.product_id,
@@ -162,10 +226,15 @@ export default function CreateOrderPage() {
           setSelectedProducts(orderItems);
           setAdvanceAmount(order.advance_bdt);
           setEditingOrderId(null); // Clear after loading
-        })
-        .catch(console.error);
+        } catch (error) {
+          console.error("Error loading order for editing:", error);
+        }
+      };
+
+      loadOrderForEditing();
     }
-  }, [customers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customers, cities]);
 
   useEffect(() => {
     if (customerPhone) {

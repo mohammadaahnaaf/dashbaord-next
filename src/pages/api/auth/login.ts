@@ -7,6 +7,40 @@ const DEFAULT_ADMIN_EMAIL = 'admin@example.com';
 const DEFAULT_MODERATOR_EMAIL = 'moderator@example.com';
 const DEFAULT_PASSWORD = 'admin123';
 
+// Helper function to retry database operations
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries = 3,
+  delayMs = 1000
+): Promise<T> {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Check if it's a connection pool timeout error
+      if (error?.message?.includes('connection pool') || 
+          error?.message?.includes('Timed out')) {
+        console.warn(`Database connection attempt ${attempt} failed, retrying...`);
+        
+        if (attempt < maxRetries) {
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+          continue;
+        }
+      }
+      
+      // If it's not a connection error or we're out of retries, throw
+      throw error;
+    }
+  }
+  
+  throw lastError;
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -28,13 +62,15 @@ export default async function handler(
 
     const emailLower = email.toLowerCase().trim();
 
-    // Check if user exists
-    let user = await prisma.user.findFirst({
-      where: {
-        email: emailLower,
-        role: role,
-      },
-    });
+    // Check if user exists with retry logic
+    let user = await withRetry(() => 
+      prisma.user.findFirst({
+        where: {
+          email: emailLower,
+          role: role,
+        },
+      })
+    );
 
     if (!user) {
       // Check if it's a default user trying to login
@@ -52,13 +88,15 @@ export default async function handler(
 
       // Create default user with hashed password
       const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-      user = await prisma.user.create({
-        data: {
-          email: emailLower,
-          passwordHash: passwordHash,
-          role: role,
-        },
-      });
+      user = await withRetry(() =>
+        prisma.user.create({
+          data: {
+            email: emailLower,
+            passwordHash: passwordHash,
+            role: role,
+          },
+        })
+      );
     } else {
       // Verify password using bcrypt
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
@@ -79,8 +117,21 @@ export default async function handler(
         role: user.role,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
-    return res.status(500).json({ error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? String(error) : undefined });
+    
+    // Better error handling for connection issues
+    if (error?.message?.includes('connection pool') || 
+        error?.message?.includes('Timed out')) {
+      return res.status(503).json({ 
+        error: 'Database connection error. Please try again in a moment.',
+        details: process.env.NODE_ENV === 'development' ? String(error) : undefined 
+      });
+    }
+    
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: process.env.NODE_ENV === 'development' ? String(error) : undefined 
+    });
   }
 }

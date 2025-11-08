@@ -125,7 +125,7 @@ export const ordersAPI = {
   },
   update: async (id: number, order: Partial<Order>): Promise<Order> => {
     return apiRequest<Order>(`/api/orders/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(order),
     });
   },

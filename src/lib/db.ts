@@ -21,8 +21,24 @@ export const prisma =
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
         : ["error"],
+    // Configure connection pool for Neon's pooler
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
+    // Connection pool configuration
+    // Neon's pooler has a connection limit, so we need to be conservative
+    // Using pgbouncer mode settings for better connection management
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// Gracefully handle disconnections on server shutdown
+if (process.env.NODE_ENV === "production") {
+  process.on("beforeExit", async () => {
+    await prisma.$disconnect();
+  });
+}
 
 export default prisma;

@@ -16,6 +16,7 @@ export default async function handler(
       case "GET":
         return await getOrder(req, res, parseInt(id));
       case "PUT":
+      case "PATCH":
         return await updateOrder(req, res, parseInt(id));
       case "DELETE":
         return await deleteOrder(req, res, parseInt(id));

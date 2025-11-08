@@ -147,10 +147,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
   };
 
   const handleEditOrder = () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { setEditingOrderId } = require("@/utils/local-storage");
-    setEditingOrderId(order.id);
-    router.push("/create-order");
+    router.push(`/update-order/${order.id}`);
     onClose();
   };
 
@@ -362,7 +359,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
             </div>
 
             {/* Tracking Link */}
-            <div className="bg-gray-50 p-3 rounded-lg mb-6">
+            <div className="bg-gray-50 p-3 hidden rounded-lg mb-6">
               <h3 className="font-semibold text-gray-800 mb-2">
                 Customer Tracking Link
               </h3>
@@ -451,7 +448,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                         Tracking Code:
                       </p>
                       <p className="font-mono text-blue-600 font-semibold">
-                        {order.pathao_tracking_code}
+                      {order.pathao_tracking_code}
                       </p>
                     </div>
 
@@ -486,7 +483,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                       <p className="text-sm text-gray-600 mb-1">Status:</p>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {order.pathao_status || "Pending"}
-                      </span>
+                    </span>
                     </div>
 
                     {pathaoOrderInfo && (
@@ -542,8 +539,8 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                     )}
 
                     <p className="text-xs text-gray-500 mt-2">
-                      Last synced: {formatDate(order.last_synced_at || "")}
-                    </p>
+                    Last synced: {formatDate(order.last_synced_at || "")}
+                  </p>
                   </div>
                 </>
               ) : (

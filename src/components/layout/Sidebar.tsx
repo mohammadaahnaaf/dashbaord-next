@@ -59,7 +59,7 @@ export function Sidebar() {
   const { userRole, logout } = useAuth();
 
   // Don't render sidebar on public pages
-  if (pathname === "/" || pathname.startsWith("/track")) {
+  if (!pathname || pathname === "/" || pathname.startsWith("/track")) {
     return null;
   }
 
@@ -80,7 +80,7 @@ export function Sidebar() {
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  pathname === item.href
+                  pathname && pathname === item.href
                     ? "bg-gray-800 text-white"
                     : "text-gray-300 hover:bg-gray-700 hover:text-white",
                   "group flex items-center text-white rounded-md px-2 py-2 text-sm font-medium"
@@ -88,7 +88,7 @@ export function Sidebar() {
               >
                 <item.icon
                   className={cn(
-                    pathname === item.href
+                    pathname && pathname === item.href
                       ? "text-white"
                       : "text-gray-400 group-hover:text-white",
                     "mr-3 h-5 w-5 shrink-0"
@@ -129,7 +129,7 @@ export function MobileSidebar({
   };
 
   // Don't render sidebar on public pages
-  if (pathname === "/" || pathname.startsWith("/track")) {
+  if (!pathname || pathname === "/" || pathname.startsWith("/track")) {
     return null;
   }
 
@@ -154,7 +154,7 @@ export function MobileSidebar({
                 key={item.name}
                 href={item.href}
                 className={cn(
-                  pathname === item.href
+                  pathname && pathname === item.href
                     ? "bg-gray-800 text-white"
                     : "text-gray-300 hover:bg-gray-700 hover:text-white",
                   "group flex items-center text-white rounded-md px-2 py-2 text-sm font-medium"
@@ -162,7 +162,7 @@ export function MobileSidebar({
               >
                 <item.icon
                   className={cn(
-                    pathname === item.href
+                    pathname && pathname === item.href
                       ? "text-white"
                       : "text-gray-400 group-hover:text-white",
                     "mr-3 h-5 w-5 shrink-0"
