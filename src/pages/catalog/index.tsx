@@ -11,7 +11,7 @@ import {
 import { Product } from "@/types";
 import { productsAPI } from "@/utils/api-client";
 import { useImageUpload } from "@/hooks/use-image-upload";
-import { Plus, Search, Trash2, Sparkles, Check } from "lucide-react";
+import { Plus, Search, Trash2, Sparkles, Check, Loader2, ImageIcon } from "lucide-react";
 import Head from "next/head";
 
 interface VariantGroup {
@@ -77,6 +77,9 @@ export default function CatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false); // Control form visibility
   const [formData, setFormData] = useState<ProductFormData>(() =>
     getInitialFormState()
@@ -101,18 +104,21 @@ export default function CatalogPage() {
     {}
   );
 
-  const { products, fetchProducts } = useStore();
+  async function fetchProducts() {
+    setLoading(true);
+    try {
+      const products = await productsAPI.getAll();
+      setProducts(products);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  // Fetch products on mount
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
-
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  }, []);
 
   const resetForm = () => {
     setFormData(getInitialFormState());
@@ -288,6 +294,7 @@ export default function CatalogPage() {
   };
 
   const handleSaveProduct = async () => {
+    setIsLoading(true);
     if (!formData.name.trim()) {
       showToast("Product name is required", "error");
       return;
@@ -350,6 +357,7 @@ export default function CatalogPage() {
     }
 
     resetForm();
+    setIsLoading(false);
   };
 
   const handleEditProduct = (product: Product) => {
@@ -438,7 +446,7 @@ export default function CatalogPage() {
 
             {/* Product Information */}
             <div className="space-y-6 mb-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Input
                   label="Product Name"
                   value={formData.name}
@@ -458,20 +466,20 @@ export default function CatalogPage() {
                   disabled
                   className="bg-gray-100"
                 />
-              </div>
 
-              <Input
-                label="Source Link"
-                value={formData.source_link}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    source_link: e.target.value,
-                  }))
-                }
-                placeholder="https://example.com/product"
-                type="url"
-              />
+                <Input
+                  label="Source Link"
+                  value={formData.source_link}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      source_link: e.target.value,
+                    }))
+                  }
+                  placeholder="https://example.com/product"
+                  type="url"
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
@@ -502,108 +510,117 @@ export default function CatalogPage() {
                 />
               </div>
 
-              {/* Main Image Upload */}
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-800">
-                  Main Image
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    ref={mainImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMainImageChange}
-                    className="hidden"
-                    id="main-image-upload"
-                    disabled={isUploadingMain}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Description */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-semibold text-gray-800">
+                      Description
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGenerateDescription}
+                      disabled={
+                        isGeneratingDescription || !formData.name.trim()
+                      }
+                      className="flex items-center gap-1"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Generate with AI
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="Enter product description..."
+                    rows={5}
                   />
-                  <label htmlFor="main-image-upload" className="cursor-pointer">
-                    <span className="inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 h-10 px-4 bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-600 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
-                      {isUploadingMain
-                        ? `Uploading ${mainProgress}%...`
-                        : formData.main_image_url
-                        ? "Change Image"
-                        : "Choose Image"}
-                    </span>
-                  </label>
-                  {isUploadingMain && (
-                    <div className="flex items-center gap-2">
-                      <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-blue-600 transition-all duration-300"
-                          style={{ width: `${mainProgress}%` }}
-                        />
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {mainProgress}%
-                      </span>
-                    </div>
-                  )}
-                  {formData.main_image_url && !isUploadingMain && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={formData.main_image_url}
-                      alt="Main product"
-                      className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
-                    />
-                  )}
                 </div>
-              </div>
 
-              {/* Description */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                {/* Main Image Upload */}
+                <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800">
-                    Description
+                    Main Image
                   </label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleGenerateDescription}
-                    disabled={isGeneratingDescription || !formData.name.trim()}
-                    className="flex items-center gap-1"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Generate with AI
-                  </Button>
+                  <div className="flex items-center gap-4">
+                    <input
+                      ref={mainImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleMainImageChange}
+                      className="hidden"
+                      id="main-image-upload"
+                      disabled={isUploadingMain}
+                    />
+                    <label
+                      htmlFor="main-image-upload"
+                      className="cursor-pointer"
+                    >
+                      <span className="flex flex-col text-gray-500 justify-center items-center gap-2 border-2 border-dashed border-gray-200 rounded-lg p-2 w-40 h-40">
+                        <ImageIcon className="w-6 h-6" />
+                        {isUploadingMain
+                          ? `Uploading ${mainProgress}%...`
+                          : formData.main_image_url
+                          ? "Change Image"
+                          : "Choose Image"}
+                      </span>
+                    </label>
+                    {isUploadingMain && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600 transition-all duration-300"
+                            style={{ width: `${mainProgress}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {mainProgress}%
+                        </span>
+                      </div>
+                    )}
+                    {formData.main_image_url && !isUploadingMain && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={formData.main_image_url}
+                        alt="Main product"
+                        className="w-40 h-40 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
+                      />
+                    )}
+                  </div>
                 </div>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter product description..."
-                  rows={4}
-                />
               </div>
-
               {/* Active Status */}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="is-active"
-                  checked={formData.is_active}
-                  onChange={(e) =>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-gray-800">
+                  Status
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.is_active}
+                  tabIndex={0}
+                  onClick={() =>
                     setFormData((prev) => ({
                       ...prev,
-                      is_active: e.target.checked,
+                      is_active: !prev.is_active,
                     }))
                   }
-                  className="w-5 h-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                />
-                <label
-                  htmlFor="is-active"
-                  className="flex items-center gap-2 text-sm font-semibold text-gray-800 cursor-pointer"
+                  className={`relative inline-flex items-center h-7 w-14 transition-colors duration-200 ease-in-out rounded-full focus:outline-none focus:ring-0
+                  ${formData.is_active ? "bg-green-600" : "bg-red-600"}`}
                 >
-                  {formData.is_active && (
-                    <Check className="w-4 h-4 text-green-600" />
-                  )}
-                  Active
-                </label>
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ease-in-out 
+                    ${formData.is_active ? "translate-x-8" : "translate-x-1"}`}
+                  />
+                  <span className="sr-only">Enable Active</span>
+                </button>
               </div>
             </div>
 
@@ -797,7 +814,11 @@ export default function CatalogPage() {
                 onClick={handleSaveProduct}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
-                Save Product
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Save Product"
+                )}
               </Button>
             </div>
           </div>
@@ -844,7 +865,7 @@ export default function CatalogPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProducts.map((product) => (
+                {products.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-center">
@@ -907,9 +928,14 @@ export default function CatalogPage() {
               </tbody>
             </table>
 
-            {filteredProducts.length === 0 && (
+            {products.length === 0 && !loading && (
               <div className="text-center py-12 text-gray-500">
                 No products found. {searchQuery && "Try adjusting your search."}
+              </div>
+            )}
+            {loading && (
+              <div className="flex justify-center items-center h-full py-12">
+                <Loader2 className="w-8 h-8 text-gray-500 animate-spin" />
               </div>
             )}
           </div>
