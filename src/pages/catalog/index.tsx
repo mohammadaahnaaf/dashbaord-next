@@ -11,7 +11,15 @@ import {
 import { Product } from "@/types";
 import { productsAPI } from "@/utils/api-client";
 import { useImageUpload } from "@/hooks/use-image-upload";
-import { Plus, Search, Trash2, Sparkles, Check, Loader2, ImageIcon } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Trash2,
+  Sparkles,
+  Check,
+  Loader2,
+  ImageIcon,
+} from "lucide-react";
 import Head from "next/head";
 
 interface VariantGroup {

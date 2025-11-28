@@ -17,7 +17,18 @@ import {
   callGeminiAPI,
   showToast,
 } from "@/components/utils";
-import { X, FilePenLine, Copy, Check } from "lucide-react";
+import {
+  X,
+  FilePenLine,
+  Copy,
+  Check,
+  User,
+  Phone,
+  MapPin,
+  Share2,
+  Truck,
+  Package,
+} from "lucide-react";
 import { Customer, Order } from "@/types";
 import Image from "next/image";
 import { getValidPathaoToken } from "@/utils/pathao-token";
@@ -67,10 +78,17 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
     (sum: number, item: any) => sum + item.sell_price_bdt_snapshot * item.qty,
     0
   );
-  const trackingLink = `${window.location.origin}/track/${order.id}`;
+  const trackingLink =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/track/${order.id}`
+      : `track/${order.id}`;
   const pathaoTrackingUrl = order.pathao_tracking_code
     ? `https://merchant.pathao.com/tracking?consignment_id=${order.pathao_tracking_code}&phone=${customer.phone}`
     : null;
+  const totalQuantity = order.items.reduce(
+    (sum: number, item: any) => sum + item.qty,
+    0
+  );
 
   // Fetch Pathao order info when drawer opens
   useEffect(() => {
@@ -204,11 +222,11 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
       }
 
       // Calculate total item quantity and weight
-      const totalQuantity = order.items.reduce(
+      const totalQuantityForShipment = order.items.reduce(
         (sum: number, item: any) => sum + item.qty,
         0
       );
-      const estimatedWeight = Math.max(0.5, totalQuantity * 0.3); // Estimate 0.3kg per item, min 0.5kg
+      const estimatedWeight = Math.max(0.5, totalQuantityForShipment * 0.3); // Estimate 0.3kg per item, min 0.5kg
 
       // Build item description
       const itemDescriptions = order.items
@@ -253,7 +271,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
           delivery_type: 48, // Standard delivery - you may need to adjust based on Pathao API docs
           item_type: 2, // Parcel - you may need to adjust based on Pathao API docs
           special_instruction: "",
-          item_quantity: totalQuantity,
+          item_quantity: totalQuantityForShipment,
           item_weight: estimatedWeight.toFixed(1),
           item_description: itemDescriptions,
           amount_to_collect: order.due_bdt,
@@ -311,163 +329,279 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+      <div
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
+        onClick={onClose}
+      />
 
       {/* Drawer */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-xl z-50 overflow-y-auto">
-        <div className="p-6 h-full flex flex-col">
-          {/* Header */}
-          <div className="flex justify-between items-center border-b pb-4 mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Order #{order.id}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Created on {formatDate(order.created_at)}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusChip status={order.status} />
-              <Button variant="ghost" size="sm" onClick={handleEditOrder}>
-                <FilePenLine className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="w-6 h-6" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Body */}
-          <div className="flex-grow">
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-2">Customer</h3>
-                <p className="font-medium">{customer.name}</p>
-                <p className="text-gray-600">{customer.phone}</p>
-                <p className="text-gray-600">{order.address}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-2">Delivery</h3>
-                <p className="text-gray-600">
-                  {order.pathao_city_name}, {order.pathao_zone_name},{" "}
-                  {order.pathao_area_name}
-                </p>
-                <p className="font-medium">
-                  Charge: {formatBDT(order.delivery_charge_bdt)}
-                </p>
-              </div>
-            </div>
-
-            {/* Tracking Link */}
-            <div className="bg-gray-50 p-3 hidden rounded-lg mb-6">
-              <h3 className="font-semibold text-gray-800 mb-2">
-                Customer Tracking Link
-              </h3>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={trackingLink}
-                  className="w-full text-sm bg-gray-200 p-2 rounded-md border-transparent focus:ring-0"
-                />
-                <Button variant="secondary" size="sm" onClick={handleCopyLink}>
-                  {isCopied ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <Copy className="w-5 h-5" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Items */}
-            <h3 className="font-semibold text-gray-700 mb-2">Items</h3>
-            <div className="space-y-2 border-t border-b py-2 mb-4">
-              {order.items.map((item: any, index: number) => (
-                <div key={index} className="flex items-center gap-4">
-                  <Image
-                    src={item.image_url_snapshot}
-                    alt={item.product_name_snapshot}
-                    width={48}
-                    height={48}
-                    className="w-12 h-12 rounded-md object-cover"
-                  />
-                  <div className="flex-grow">
-                    <p className="font-medium">{item.product_name_snapshot}</p>
-                    {item.color_snapshot && item.size_snapshot && (
-                      <p className="text-sm text-gray-500">
-                        {item.color_snapshot} / {item.size_snapshot}
-                      </p>
-                    )}
+      <div className="fixed top-0 right-0 h-full w-full max-w-2xl z-50 shadow-2xl">
+        <div className="flex h-full flex-col bg-white border-l border-slate-200">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Header */}
+            <div className="rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xl p-6">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-end gap-3">
+                    <h2 className="text-4xl font-semibold tracking-tight">
+                      Order #{order.id}
+                    </h2>
                   </div>
-                  <div className="text-right">
-                    <p>
-                      {formatBDT(item.sell_price_bdt_snapshot)} × {item.qty}
+                  <p className="text-white/80 text-sm">
+                    {order.items.length} items · {totalQuantity} units ·{" "}
+                    {formatBDT(subtotal)}
+                    <span className="text-white/80 text-sm ml-2">
+                      Created {formatDate(order.created_at)}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-3">
+                  <StatusChip status={order.status} />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleEditOrder}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <FilePenLine className="w-4 h-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onClose}
+                      className="text-white hover:bg-white/20"
+                    >
+                      <X className="w-5 h-5" />
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer + Delivery */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-100 bg-white/90 p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="rounded-2xl bg-blue-50 text-blue-600 p-3">
+                    <User className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Customer
                     </p>
-                    <p className="font-semibold">
-                      {formatBDT(item.sell_price_bdt_snapshot * item.qty)}
+                    <p className="text-lg font-semibold text-slate-900">
+                      {customer.name}
                     </p>
                   </div>
                 </div>
-              ))}
+                <div className="space-y-2 text-sm text-slate-600">
+                  <p className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-slate-400" />
+                    {customer.phone}
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                    {order.address}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white/90 p-5 shadow-sm space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-2xl bg-slate-100 text-slate-600 p-3">
+                    <Truck className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Delivery
+                    </p>
+                    <p className="text-base font-semibold text-slate-900">
+                      {order.pathao_city_name || "City"} •{" "}
+                      {order.pathao_zone_name || "Zone"} •{" "}
+                      {order.pathao_area_name || "Area"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-dashed border-slate-200 p-3 bg-slate-50">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">
+                    Delivery charge
+                    <p className="text-lg font-semibold text-slate-900">
+                      {formatBDT(order.delivery_charge_bdt)}
+                    </p>
+                  </div>
+                  <div className="text-xs uppercase tracking-wide text-slate-400 text-right">
+                    Advance paid
+                    <p className="text-lg font-semibold text-emerald-600">
+                      {formatBDT(order.advance_bdt)}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Summary */}
-            <div className="space-y-1 text-right mb-6">
-              <p>
-                Subtotal:{" "}
-                <span className="font-medium">{formatBDT(subtotal)}</span>
-              </p>
-              <p>
-                Delivery:{" "}
-                <span className="font-medium">
-                  {formatBDT(order.delivery_charge_bdt)}
-                </span>
-              </p>
-              <p>
-                Advance:{" "}
-                <span className="font-medium text-green-600">
-                  -{formatBDT(order.advance_bdt)}
-                </span>
-              </p>
-              <p className="text-xl font-bold text-red-600">
-                Due: <span>{formatBDT(order.due_bdt)}</span>
-              </p>
+            {/* Tracking link */}
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-white/90 p-4 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-blue-600">
+                    Customer tracking link
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Share this link so your customer can follow their delivery.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="gap-2"
+                >
+                  {isCopied ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
+                  {isCopied ? "Copied" : "Copy link"}
+                </Button>
+              </div>
+              <div className="mt-3 rounded-xl bg-slate-100 px-4 py-2 text-sm font-mono text-slate-700 overflow-x-auto">
+                {trackingLink}
+              </div>
+            </div>
+
+            {/* Items + summary */}
+            <div className="grid gap-4 lg:grid-cols-1">
+              <div className="rounded-3xl border border-slate-100 bg-white shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Items ({order.items.length})
+                  </h3>
+                  <span className="text-xs uppercase tracking-wide text-slate-400">
+                    {totalQuantity} units
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {order.items.map((item: any, index: number) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div className="relative">
+                        <Image
+                          src={item.image_url_snapshot}
+                          alt={item.product_name_snapshot}
+                          width={56}
+                          height={56}
+                          className="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200"
+                        />
+                        <span className="absolute -top-1 -right-1 rounded-full bg-slate-900 text-white text-[10px] px-1.5 py-0.5">
+                          ×{item.qty}
+                        </span>
+                      </div>
+                      <div className="flex-grow">
+                        <p className="font-medium text-slate-900">
+                          {item.product_name_snapshot}
+                        </p>
+                        <p className="text-sm text-slate-500 flex items-center gap-1">
+                          <Package className="w-3.5 h-3.5 text-slate-400" />
+                          {item.color_snapshot || "—"} /{" "}
+                          {item.size_snapshot || "—"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-slate-500">
+                          {formatBDT(item.sell_price_bdt_snapshot)}
+                        </p>
+                        <p className="font-semibold text-slate-900">
+                          {formatBDT(item.sell_price_bdt_snapshot * item.qty)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-amber-50 text-gray-600 shadow-lg p-5 flex flex-col gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">
+                    Payment summary
+                  </p>
+                </div>
+                <div className="space-y-3 text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span className="font-semibold">{formatBDT(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Delivery</span>
+                    <span className="font-semibold">
+                      {formatBDT(order.delivery_charge_bdt)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-emerald-300">
+                    <span>Advance</span>
+                    <span className="font-semibold">
+                      -{formatBDT(order.advance_bdt)}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-amber-100 p-4 text-center mt-auto">
+                  <p className="text-xs uppercase tracking-wide text-gray-600">
+                    Due amount
+                  </p>
+                  <p className="text-3xl font-semibold">
+                    {formatBDT(order.due_bdt)}
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Pathao Panel */}
-            <div className="bg-gray-50 p-4 rounded-lg mb-6">
-              <h3 className="font-semibold text-gray-800 mb-2">
-                Pathao Details
-              </h3>
-              {order.pathao_tracking_code ? (
-                <>
-                  <div className="space-y-3">
+            <div className="grid gap-4">
+              <div className="rounded-3xl border border-slate-100 bg-white shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Pathao details
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900">
+                      {order.pathao_tracking_code ? "In transit" : "Not sent"}
+                    </p>
+                  </div>
+                  <Truck className="w-8 h-8 text-slate-300" />
+                </div>
+
+                {order.pathao_tracking_code ? (
+                  <div className="space-y-4">
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">
-                        Tracking Code:
+                      <p className="text-xs uppercase tracking-wide text-slate-400">
+                        Tracking code
                       </p>
-                      <p className="font-mono text-blue-600 font-semibold">
-                      {order.pathao_tracking_code}
+                      <p className="font-mono text-lg text-blue-600">
+                        {order.pathao_tracking_code}
                       </p>
                     </div>
 
                     {pathaoTrackingUrl && (
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">
-                          Pathao Tracking URL:
+                        <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+                          Tracking URL
                         </p>
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
                             readOnly
                             value={pathaoTrackingUrl}
-                            className="flex-1 text-sm bg-white p-2 rounded-md border border-gray-300 focus:ring-0"
+                            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600"
                           />
                           <Button
                             variant="secondary"
                             size="sm"
                             onClick={handleCopyPathaoTrackingLink}
+                            className="gap-1"
                           >
                             {isCopiedPathaoTracking ? (
                               <Check className="w-4 h-4" />
@@ -479,40 +613,34 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                       </div>
                     )}
 
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Status:</p>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {order.pathao_status || "Pending"}
-                    </span>
+                    <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-600">
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                        Status
+                      </span>
+                      {order.pathao_status || "Pending"}
                     </div>
 
                     {pathaoOrderInfo && (
-                      <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
-                        <p className="text-sm font-semibold text-gray-700 mb-2">
-                          Pathao Order Information
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                        <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">
+                          Live insights
                         </p>
                         {isLoadingPathaoInfo ? (
-                          <p className="text-sm text-gray-500">Loading...</p>
+                          <p className="text-sm text-slate-500">Loading…</p>
                         ) : (
-                          <div className="space-y-1 text-sm">
+                          <div className="space-y-1 text-sm text-slate-600">
                             {pathaoOrderInfo.consignment_id && (
                               <p>
                                 <span className="font-medium">
-                                  Consignment ID:
+                                  Consignment:
                                 </span>{" "}
                                 {pathaoOrderInfo.consignment_id}
-                              </p>
-                            )}
-                            {pathaoOrderInfo.status && (
-                              <p>
-                                <span className="font-medium">Status:</span>{" "}
-                                {pathaoOrderInfo.status}
                               </p>
                             )}
                             {pathaoOrderInfo.delivery_status && (
                               <p>
                                 <span className="font-medium">
-                                  Delivery Status:
+                                  Delivery status:
                                 </span>{" "}
                                 {pathaoOrderInfo.delivery_status}
                               </p>
@@ -520,7 +648,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                             {pathaoOrderInfo.amount_to_collect && (
                               <p>
                                 <span className="font-medium">
-                                  Amount to Collect:
+                                  Amount to collect:
                                 </span>{" "}
                                 {formatBDT(pathaoOrderInfo.amount_to_collect)}
                               </p>
@@ -528,7 +656,7 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                             {pathaoOrderInfo.delivery_charge && (
                               <p>
                                 <span className="font-medium">
-                                  Delivery Charge:
+                                  Delivery charge:
                                 </span>{" "}
                                 {formatBDT(pathaoOrderInfo.delivery_charge)}
                               </p>
@@ -538,51 +666,59 @@ export default function OrderDrawer({ orderId, onClose }: OrderDrawerProps) {
                       </div>
                     )}
 
-                    <p className="text-xs text-gray-500 mt-2">
-                    Last synced: {formatDate(order.last_synced_at || "")}
-                  </p>
+                    <p className="text-xs text-slate-400">
+                      Last synced: {formatDate(order.last_synced_at || "")}
+                    </p>
                   </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-600">
-                    This order has not been sent to Pathao yet.
-                  </p>
-                  <div className="mt-3">
+                ) : (
+                  <div className="space-y-4 text-slate-600">
+                    <p>
+                      This order has not been pushed to Pathao yet. Confirm the
+                      delivery details above before sending.
+                    </p>
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={handleSendToPathao}
                       loading={isSendingToPathao}
                       disabled={isSendingToPathao}
+                      className="w-full"
                     >
                       Send to Pathao
                     </Button>
                   </div>
-                </>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Customer Communication */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-800 mb-2">
-                Customer Communication
-              </h3>
-              <Textarea
-                id="customer-comm-message"
-                rows={4}
-                className="mb-2"
-                placeholder="Draft a message for the customer..."
-              />
-              <div className="flex justify-end">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSuggestMessage}
-                  loading={isGeneratingMessage}
-                >
-                  ✨ Suggest Follow-up Message
-                </Button>
+              {/* Customer Communication */}
+              <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-blue-50 via-white to-slate-50 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Customer communication
+                    </p>
+                    <p className="text-base font-semibold text-slate-900">
+                      Personalize your follow-up
+                    </p>
+                  </div>
+                </div>
+                <Textarea
+                  id="customer-comm-message"
+                  rows={4}
+                  className="mb-3 border-slate-200 bg-white/80"
+                  placeholder="Draft a friendly update for your customer..."
+                />
+                <div className="flex justify-end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSuggestMessage}
+                    loading={isGeneratingMessage}
+                    className="gap-2"
+                  >
+                    ✨ Suggest follow-up
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
