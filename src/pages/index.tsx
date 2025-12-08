@@ -81,114 +81,116 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
+    <div className="min-h-screen grid p-4 items-center justify-end bg-[url('/login-bg.jpg')] bg-cover bg-center">
+      <div className="max-w-md grid items-center justify-center w-full space-y-8 p-8 bg-black/50 backdrop-blur-md rounded-2xl shadow-lg">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to Dashboard
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Use default credentials for demo
-          </p>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          <div className="space-y-4">
-            <div>
-              <Input
-                label="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <Input
-                label="Password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-700">
-                Select Role
-              </label>
-              <div className="mt-2 space-y-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    name="role"
-                    value="admin"
-                    checked={selectedRole === "admin"}
-                    onChange={(e) => {
-                      const role = e.target.value as UserRole;
-                      setSelectedRole(role);
-                      fillDefaultCredentials(role);
-                    }}
-                  />
-                  <span className="text-sm text-gray-700">Admin</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    name="role"
-                    value="moderator"
-                    checked={selectedRole === "moderator"}
-                    onChange={(e) => {
-                      const role = e.target.value as UserRole;
-                      setSelectedRole(role);
-                      fillDefaultCredentials(role);
-                    }}
-                  />
-                  <span className="text-sm text-gray-700">Moderator</span>
-                </label>
-              </div>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillDefaultCredentials("admin")}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Fill Admin Credentials
-                </button>
-                <span className="text-xs text-gray-400">|</span>
-                <button
-                  type="button"
-                  onClick={() => fillDefaultCredentials("moderator")}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Fill Moderator Credentials
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-md bg-red-50 p-3">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
+          <div>
+            <h2 className="mt-6 text-center text-2xl font-extrabold text-gray-100">
+              Sign in
+            </h2>
+            <p className="mt-2 text-center text-sm text-gray-200">
+              Use default credentials for demo
+            </p>
           </div>
+          <form className="mt-8 space-y-6 text-gray-100" onSubmit={handleLogin}>
+            <div className="space-y-4">
+              <div>
+                <Input
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
 
-          <Button
-            type="submit"
-            loading={isLoading}
-            className="w-full"
-            size="lg"
-          >
-            Sign in
-          </Button>
-        </form>
+              <div>
+                <Input
+                  label="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-200">
+                  Select Role
+                </label>
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      className="form-radio h-4 w-4 text-blue-600"
+                      name="role"
+                      value="admin"
+                      checked={selectedRole === "admin"}
+                      onChange={(e) => {
+                        const role = e.target.value as UserRole;
+                        setSelectedRole(role);
+                        fillDefaultCredentials(role);
+                      }}
+                    />
+                    <span className="text-sm text-gray-200">Admin</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      className="form-radio h-4 w-4 text-blue-600"
+                      name="role"
+                      value="moderator"
+                      checked={selectedRole === "moderator"}
+                      onChange={(e) => {
+                        const role = e.target.value as UserRole;
+                        setSelectedRole(role);
+                        fillDefaultCredentials(role);
+                      }}
+                    />
+                    <span className="text-sm text-gray-200">Moderator</span>
+                  </label>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fillDefaultCredentials("admin")}
+                    className="text-xs text-blue-200 hover:text-blue-700 underline"
+                  >
+                    Fill Admin Credentials
+                  </button>
+                  <span className="text-xs text-gray-400">|</span>
+                  <button
+                    type="button"
+                    onClick={() => fillDefaultCredentials("moderator")}
+                    className="text-xs text-blue-200 hover:text-blue-700 underline"
+                  >
+                    Fill Moderator Credentials
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="rounded-md bg-red-50 p-3">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              loading={isLoading}
+              className="w-full"
+              size="lg"
+            >
+              Sign in
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

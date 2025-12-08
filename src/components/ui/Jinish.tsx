@@ -229,7 +229,7 @@ export function Input({ label, error, className, icon, ref, ...props }: InputPro
   return (
     <div className="space-y-2">
       {label && (
-        <label className="block text-sm font-semibold text-gray-800">
+        <label className="block text-sm font-semibold">
           {label}
         </label>
       )}
@@ -242,7 +242,7 @@ export function Input({ label, error, className, icon, ref, ...props }: InputPro
         <input
           ref={ref}
           className={cn(
-            "block w-full px-4 py-3 text-base border !border-gray-200 rounded-xl transition-all duration-200",
+            "block w-full px-4 py-3 text-base border-2 !border-gray-200 rounded-xl transition-all duration-200",
             "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
             "hover:border-gray-300 focus:shadow-lg disabled:bg-gray-50 disabled:text-gray-500",
             icon ? "pl-10" : "",

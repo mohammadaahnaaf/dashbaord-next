@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/router";
 import { Button, Input, Textarea } from "@/components/ui";
 import useStore from "@/store";
 import {
@@ -82,6 +83,7 @@ const getProductIconColor = (name: string): string => {
 };
 
 export default function CatalogPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
@@ -303,69 +305,84 @@ export default function CatalogPage() {
 
   const handleSaveProduct = async () => {
     setIsLoading(true);
-    if (!formData.name.trim()) {
-      showToast("Product name is required", "error");
-      return;
+    try {
+      if (!formData.name.trim()) {
+        showToast("Product name is required", "error");
+        setIsLoading(false);
+        return;
+      }
+
+      const basePrice = parseNumber(formData.base_price_bdt);
+      const sellPrice = parseNumber(formData.sell_price_bdt);
+
+      if (basePrice <= 0 || sellPrice <= 0) {
+        showToast("Base price and sell price must be greater than 0", "error");
+        setIsLoading(false);
+        return;
+      }
+
+      const productCode = formData.code || generateProductCode(formData.name);
+
+      const variantGroups = formData.variant_groups.map((group) => ({
+        color: group.color,
+        sizes: group.sizes,
+        quantities: group.quantities || {},
+        sell_price_override: group.sell_price_override
+          ? parseNumber(group.sell_price_override)
+          : undefined,
+        image_url: group.image_url || "",
+      }));
+
+      if (isEditing && editingProductId) {
+        // Update existing product
+        const updatedProduct: Partial<Product> = {
+          name: formData.name,
+          code: productCode,
+          source_link: formData.source_link,
+          base_price_bdt: basePrice,
+          sell_price_bdt: sellPrice,
+          image_url: formData.main_image_url,
+          description: formData.description,
+          is_active: formData.is_active,
+          variant_groups: variantGroups,
+        };
+
+        await productsAPI.update(editingProductId, updatedProduct);
+        await fetchProducts();
+        showToast("Product updated successfully", "success");
+      } else {
+        // Create new product
+        const newProduct: Partial<Product> = {
+          name: formData.name,
+          code: productCode,
+          source_link: formData.source_link,
+          base_price_bdt: basePrice,
+          sell_price_bdt: sellPrice,
+          image_url: formData.main_image_url,
+          description: formData.description,
+          is_active: formData.is_active,
+          variant_groups: variantGroups,
+        };
+
+        await productsAPI.create(newProduct as Product);
+        await fetchProducts();
+        showToast("Product created successfully", "success");
+        
+        // Redirect to orders page after creating product
+        router.push("/orders");
+        return;
+      }
+
+      resetForm();
+      setIsLoading(false);
+    } catch (error: any) {
+      console.error("Error saving product:", error);
+      showToast(
+        error?.message || "Failed to save product. Please try again.",
+        "error"
+      );
+      setIsLoading(false);
     }
-
-    const basePrice = parseNumber(formData.base_price_bdt);
-    const sellPrice = parseNumber(formData.sell_price_bdt);
-
-    if (basePrice <= 0 || sellPrice <= 0) {
-      showToast("Base price and sell price must be greater than 0", "error");
-      return;
-    }
-
-    const productCode = formData.code || generateProductCode(formData.name);
-
-    const variantGroups = formData.variant_groups.map((group) => ({
-      color: group.color,
-      sizes: group.sizes,
-      quantities: group.quantities || {},
-      sell_price_override: group.sell_price_override
-        ? parseNumber(group.sell_price_override)
-        : undefined,
-      image_url: group.image_url || "",
-    }));
-
-    if (isEditing && editingProductId) {
-      // Update existing product
-      const updatedProduct: Partial<Product> = {
-        name: formData.name,
-        code: productCode,
-        source_link: formData.source_link,
-        base_price_bdt: basePrice,
-        sell_price_bdt: sellPrice,
-        image_url: formData.main_image_url,
-        description: formData.description,
-        is_active: formData.is_active,
-        variant_groups: variantGroups,
-      };
-
-      await productsAPI.update(editingProductId, updatedProduct);
-      await fetchProducts();
-      showToast("Product updated successfully", "success");
-    } else {
-      // Create new product
-      const newProduct: Partial<Product> = {
-        name: formData.name,
-        code: productCode,
-        source_link: formData.source_link,
-        base_price_bdt: basePrice,
-        sell_price_bdt: sellPrice,
-        image_url: formData.main_image_url,
-        description: formData.description,
-        is_active: formData.is_active,
-        variant_groups: variantGroups,
-      };
-
-      await productsAPI.create(newProduct as Product);
-      await fetchProducts();
-      showToast("Product created successfully", "success");
-    }
-
-    resetForm();
-    setIsLoading(false);
   };
 
   const handleEditProduct = (product: Product) => {
