@@ -4,6 +4,7 @@ import { Button, Modal, Select } from "@/components/ui";
 import useStore from "@/store";
 import { Batch, Order, UserRole } from "@/types";
 import { X } from "lucide-react";
+import { batchesAPI } from "@/utils/api-client";
 
 interface BulkActionsBarProps {
   selectedOrders: number[];
@@ -17,9 +18,11 @@ export default function BulkActionsBar({
   userRole,
 }: BulkActionsBarProps) {
   const [isAssignBatchModalOpen, setIsAssignBatchModalOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
   // Guard against SSR - only access store on client side
   const orders = typeof window !== 'undefined' ? (useStore((state) => state.orders) || []) : [];
   const batches = typeof window !== 'undefined' ? (useStore((state) => state.batches) || []) : [];
+  const fetchBatches = typeof window !== 'undefined' ? useStore((state) => state.fetchBatches) : null;
 
   const handleUpdateStatus = async (status: string) => {
     // In a real app, this would be an API call
@@ -38,45 +41,66 @@ export default function BulkActionsBar({
     onClearSelection();
   };
 
-  const handleAssignToBatch = (batchId: number) => {
-    const allBatchedOrderIds = batches.flatMap((b: Batch) => b.order_ids);
-    const unbatchedSelectedIds = selectedOrders.filter(
-      (id) => !allBatchedOrderIds.includes(id)
-    );
+  const handleAssignToBatch = async (batchId: number) => {
+    if (isAssigning) return;
 
-    if (unbatchedSelectedIds.length === 0) {
-      //   showToast("All selected orders are already in a batch", "info");
-      return;
+    try {
+      setIsAssigning(true);
+      
+      // Find the batch
+      const batch = batches.find((b: Batch) => b.id === batchId);
+      if (!batch) {
+        alert("Batch not found");
+        return;
+      }
+
+      // Get all orders that are already in any batch
+      const allBatchedOrderIds = batches.flatMap((b: Batch) => b.order_ids || []);
+      const unbatchedSelectedIds = selectedOrders.filter(
+        (id) => !allBatchedOrderIds.includes(id)
+      );
+
+      if (unbatchedSelectedIds.length === 0) {
+        alert("All selected orders are already in a batch");
+        return;
+      }
+
+      // Merge existing order IDs with new ones
+      const updatedOrderIds = [
+        ...new Set([...(batch.order_ids || []), ...unbatchedSelectedIds]),
+      ];
+
+      // Call API to update the batch
+      await batchesAPI.update(batchId, {
+        order_ids: updatedOrderIds,
+      });
+
+      // Refresh batches from API
+      if (fetchBatches) {
+        await fetchBatches();
+      }
+
+      const skippedCount = selectedOrders.length - unbatchedSelectedIds.length;
+      if (skippedCount > 0) {
+        alert(
+          `${unbatchedSelectedIds.length} orders assigned to Batch #${batchId}. ${skippedCount} orders were already in a batch and were skipped.`
+        );
+      } else {
+        alert(`${unbatchedSelectedIds.length} orders assigned to Batch #${batchId}`);
+      }
+
+      setIsAssignBatchModalOpen(false);
+      onClearSelection();
+    } catch (error) {
+      console.error("Error assigning orders to batch:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to assign orders to batch. Please try again."
+      );
+    } finally {
+      setIsAssigning(false);
     }
-
-    useStore.setState({
-      batches: batches.map((batch: Batch) =>
-        batch.id === batchId
-          ? {
-              ...batch,
-              order_ids: [
-                ...new Set([...batch.order_ids, ...unbatchedSelectedIds]),
-              ],
-            }
-          : batch
-      ),
-    });
-
-    // showToast(
-    // `${unbatchedSelectedIds.length} orders assigned to Batch #${batchId}`,
-    // "success"
-    // );
-
-    const skippedCount = selectedOrders.length - unbatchedSelectedIds.length;
-    if (skippedCount > 0) {
-      // showToast(
-      //     `${skippedCount} orders were already in a batch and were skipped`,
-      //     "info"
-      // );
-    }
-
-    setIsAssignBatchModalOpen(false);
-    onClearSelection();
   };
 
   return (
@@ -149,34 +173,52 @@ export default function BulkActionsBar({
             assign them to:
           </p>
 
-          <Select
-            label="Select Batch"
-            options={batches.map((batch: Batch) => ({
-              value: batch.id.toString(),
-              label: `#${batch.id} - ${batch.note}`,
-            }))}
-            onChange={(e) => handleAssignToBatch(parseInt(e.target.value))}
-          />
+          {batches.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No batches available. Please create a batch first.
+            </p>
+          ) : (
+            <Select
+              label="Select Batch"
+              options={batches.map((batch: Batch) => ({
+                value: batch.id.toString(),
+                label: `#${batch.id} - ${batch.note || "No note"}`,
+              }))}
+              onChange={(e) => {
+                const batchId = parseInt(e.target.value);
+                if (batchId) {
+                  handleAssignToBatch(batchId);
+                }
+              }}
+            />
+          )}
 
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => setIsAssignBatchModalOpen(false)}
+              disabled={isAssigning}
             >
               Cancel
             </Button>
-            <Button
-              onClick={() => {
-                const select = document.querySelector(
-                  "select"
-                ) as HTMLSelectElement;
-                if (select) {
-                  handleAssignToBatch(parseInt(select.value));
-                }
-              }}
-            >
-              Assign Orders
-            </Button>
+            {batches.length > 0 && (
+              <Button
+                onClick={() => {
+                  const select = document.querySelector(
+                    "select"
+                  ) as HTMLSelectElement;
+                  if (select && select.value) {
+                    handleAssignToBatch(parseInt(select.value));
+                  } else {
+                    alert("Please select a batch");
+                  }
+                }}
+                loading={isAssigning}
+                disabled={isAssigning}
+              >
+                Assign Orders
+              </Button>
+            )}
           </div>
         </div>
       </Modal>

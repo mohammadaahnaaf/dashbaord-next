@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Modal, Textarea } from "@/components/ui";
 import { useAuth } from "@/contexts";
 import { callGeminiAPI } from "@/components/utils";
-import { Plus, Search, ArrowRight } from "lucide-react";
+import { Plus, Search, ArrowRight, Sparkles, Package } from "lucide-react";
 import { formatDate, formatBDT } from "@/components/utils";
 import { batchesAPI, ordersAPI } from "@/utils/api-client";
 import { Batch, Order } from "@/types";
@@ -114,14 +114,76 @@ export default function BatchesPage() {
     );
   }
 
+  const handleCreateBatchWithAllOrders = async () => {
+    if (!batchNote.trim()) {
+      alert("Please enter a batch note");
+      return;
+    }
+
+    try {
+      // Get all order IDs that are not in any batch
+      const allBatchedOrderIds = batches.flatMap((b) => b.order_ids || []);
+      const unbatchedOrderIds = orders
+        .filter((order) => !allBatchedOrderIds.includes(order.id))
+        .map((order) => order.id);
+
+      if (unbatchedOrderIds.length === 0) {
+        alert("All orders are already in batches");
+        return;
+      }
+
+      const createdBy = userEmail || "system";
+      const newBatch = await batchesAPI.create({
+        note: batchNote.trim(),
+        created_by: createdBy,
+        order_ids: unbatchedOrderIds,
+      });
+
+      await fetchData(); // Refresh batches list
+      alert(
+        `Batch created successfully with ${unbatchedOrderIds.length} orders`
+      );
+      setIsCreateModalOpen(false);
+      setBatchNote("");
+    } catch (error: unknown) {
+      console.error("Error creating batch:", error);
+      const errorMessage =
+        error && typeof error === "object" && "error" in error
+          ? String((error as { error: string }).error)
+          : "Failed to create batch. Please try again.";
+      alert(errorMessage);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Batches</h1>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Batch
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const allBatchedOrderIds = batches.flatMap(
+                (b) => b.order_ids || []
+              );
+              const unbatchedCount = orders.filter(
+                (order) => !allBatchedOrderIds.includes(order.id)
+              ).length;
+              if (unbatchedCount === 0) {
+                alert("All orders are already in batches");
+                return;
+              }
+              setIsCreateModalOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Batch with All Unbatched Orders
+          </Button>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Empty Batch
+          </Button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm mb-6">
@@ -231,37 +293,114 @@ export default function BatchesPage() {
           setBatchNote("");
         }}
         title="Create New Batch"
+        maxWidth="lg"
       >
-        <div className="space-y-4">
-          <div className="flex gap-2">
-            <Textarea
-              label="Batch Note"
-              value={batchNote}
-              onChange={(e) => setBatchNote(e.target.value)}
-              className="flex-1"
-              placeholder="Enter a descriptive note for this batch..."
-            />
-            <Button
-              variant="secondary"
-              onClick={handleSuggestBatchNote}
-              loading={isGeneratingNote}
-              className="mt-6"
-            >
-              Suggest
-            </Button>
+        <div className="space-y-6">
+          {/* Info Section */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <Package className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                  Batch Information
+                </h3>
+                <p className="text-sm text-blue-700">
+                  {(() => {
+                    const allBatchedOrderIds = batches.flatMap(
+                      (b) => b.order_ids || []
+                    );
+                    const unbatchedCount = orders.filter(
+                      (order) => !allBatchedOrderIds.includes(order.id)
+                    ).length;
+                    return unbatchedCount > 0
+                      ? `You have ${unbatchedCount} unbatched order${unbatchedCount !== 1 ? "s" : ""} available to add to this batch.`
+                      : "All orders are currently assigned to batches.";
+                  })()}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex justify-end gap-2">
+          {/* Batch Note Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <span>Batch Note</span>
+                <span className="text-xs font-normal text-gray-500">
+                  (Required)
+                </span>
+              </label>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSuggestBatchNote}
+                loading={isGeneratingNote}
+                className="flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                {isGeneratingNote ? "Generating..." : "AI Suggest"}
+              </Button>
+            </div>
+            <Textarea
+              value={batchNote}
+              onChange={(e) => setBatchNote(e.target.value)}
+              placeholder="e.g., 'March T-Shirt Collection - Dhaka Delivery' or 'Pre-orders for Spring Collection'"
+              className="min-h-[120px] text-base"
+              rows={4}
+            />
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <span>💡</span>
+              <span>
+                A descriptive note helps identify and organize batches later.
+              </span>
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsCreateModalOpen(false);
                 setBatchNote("");
               }}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateBatch}>Create Batch</Button>
+            {(() => {
+              const allBatchedOrderIds = batches.flatMap(
+                (b) => b.order_ids || []
+              );
+              const unbatchedCount = orders.filter(
+                (order) => !allBatchedOrderIds.includes(order.id)
+              ).length;
+              return unbatchedCount > 0 ? (
+                <Button
+                  variant="secondary"
+                  onClick={handleCreateBatchWithAllOrders}
+                  disabled={!batchNote.trim()}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2"
+                >
+                  <Package className="w-4 h-4" />
+                  Create with {unbatchedCount} Unbatched Order
+                  {unbatchedCount !== 1 ? "s" : ""}
+                </Button>
+              ) : null;
+            })()}
+            <Button
+              onClick={handleCreateBatch}
+              disabled={!batchNote.trim()}
+              className="w-full sm:w-auto flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Empty Batch
+            </Button>
           </div>
         </div>
       </Modal>

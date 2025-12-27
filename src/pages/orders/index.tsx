@@ -10,6 +10,7 @@ import { Search, Filter, Trash2 } from "lucide-react";
 import OrderDrawer from "@/components/orders/OrderDrawer";
 import BulkActionsBar from "@/components/orders/BulkActionsBar";
 import { Customer, Order } from "@/types";
+import useStore from "@/store";
 
 // Force server-side rendering to avoid static generation issues with Zustand store
 export const getServerSideProps: GetServerSideProps = async () => {
@@ -27,6 +28,8 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewingOrderId, setViewingOrderId] = useState<number | null>(null);
 
+  const fetchBatches = useStore((state) => state.fetchBatches);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -37,12 +40,17 @@ export default function OrdersPage() {
         const customersData = await customersAPI.getAll();
         setCustomers(customersData);
         setCustomersState(customersData);
+
+        // Fetch batches so they're available for assignment
+        if (fetchBatches) {
+          await fetchBatches();
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
     fetchData();
-  }, []);
+  }, [fetchBatches]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

@@ -7,14 +7,18 @@ import { Button, StatusChip } from "@/components/ui";
 import useStore from "@/store";
 // import { showToast } from '@/utils';
 import { formatDate, formatBDT } from "@/components/utils";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Download, Printer, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { OrderItem } from "@/types";
+import { batchesAPI } from "@/utils/api-client";
 
 export default function BatchDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { batches, orders, products } = useStore();
+  const fetchBatches = useStore((state) => state.fetchBatches);
+  const fetchOrders = useStore((state) => state.fetchOrders);
+  const [isAddingOrders, setIsAddingOrders] = useState(false);
 
   const [analytics, setAnalytics] = useState({
     totalBuying: 0,
@@ -29,6 +33,12 @@ export default function BatchDetailsPage() {
 
   const batchId = parseInt(params.id as string);
   const batch = batches.find((b) => b.id === batchId);
+
+  // Fetch fresh data on mount
+  useEffect(() => {
+    if (fetchBatches) fetchBatches();
+    if (fetchOrders) fetchOrders();
+  }, [fetchBatches, fetchOrders]);
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
@@ -83,55 +93,152 @@ export default function BatchDetailsPage() {
   );
 
   const handleExportXLSX = () => {
-    // Agent Order Summary Sheet
-    const summaryData = batchOrders.map((order) => ({
-      "Order ID": order.id,
-      "Customer Name": order.customer_name,
-      Phone: order.customer_phone,
-      Address: order.delivery_address,
-      "Total Amount": order.total_amount,
-      Status: order.status,
-      "Created At": formatDate(order.created_at),
-    }));
+    // Get all items from all orders in the batch
+    const allItems = batchOrders.flatMap((order) => order.items);
 
-    // Variant Details Sheet
-    const variantData = batchOrders.flatMap((order) =>
-      order.items.map((item) => {
+    // --- 1. Prepare data for Agent_Order_Summary sheet ---
+    // Group items by product_id and aggregate variants
+    const productSummary = allItems.reduce((acc, item) => {
+      if (!acc[item.product_id]) {
         const product = products.find((p) => p.id === item.product_id);
-        return {
-          "Order ID": order.id,
-          "Product Code": product?.code || "",
-          "Product Name": product?.name || "",
-          Quantity: item.quantity,
-          "Unit Price": item.price,
-          "Total Price": item.price * item.quantity,
+        acc[item.product_id] = {
+          product: product,
+          totalQty: 0,
+          variants: {} as Record<string, number>, // e.g., { "Red 41": 2, "Red 42": 1 }
         };
-      })
-    );
+      }
 
-    // README Sheet
-    const readmeData = [
-      ["Batch Analytics"],
-      ["Total Buying", analytics.totalBuying],
-      ["Total Selling", analytics.totalSelling],
-      ["Total Profit", analytics.totalProfit],
+      acc[item.product_id].totalQty += item.qty || item.quantity || 0;
+      const variantKey = `${item.color_snapshot || ""} ${item.size_snapshot || ""}`.trim();
+      if (variantKey) {
+        acc[item.product_id].variants[variantKey] =
+          (acc[item.product_id].variants[variantKey] || 0) +
+          (item.qty || item.quantity || 0);
+      }
+
+      return acc;
+    }, {} as Record<number, { product: any; totalQty: number; variants: Record<string, number> }>);
+
+    const summarySheetData = Object.values(productSummary).map((summary) => {
+      const variantsSummaryString = Object.entries(summary.variants)
+        .map(([variant, qty]) => `${variant}×${qty}`)
+        .join("; ");
+
+      return {
+        BatchID: batch.id,
+        ProductID: summary.product?.id || "",
+        ProductName: summary.product?.name || "",
+        ProductLink: summary.product?.source_link || summary.product?.sourceLink || "",
+        ImageURL: summary.product?.image_url || summary.product?.imageUrl || "",
+        VariantsSummary: variantsSummaryString,
+        TotalQty: summary.totalQty,
+        "PricePerUnit_CNY (Agent)": "",
+        "Seller→Agent_Ship_CNY (Agent)": "",
+        Subtotal_CNY: "",
+        TotalCost_CNY: "",
+        TotalCost_BDT: "",
+        Notes: "",
+      };
+    });
+
+    // --- 2. Prepare data for Variant_Details sheet ---
+    // Group items by product_id + color + size
+    const variantDetails = allItems.reduce((acc, item) => {
+      const key = `${item.product_id}-${item.color_snapshot || ""}-${item.size_snapshot || ""}`;
+      if (!acc[key]) {
+        acc[key] = {
+          BatchID: batch.id,
+          ProductID: item.product_id,
+          ProductName: item.product_name_snapshot,
+          Color: item.color_snapshot || "",
+          Size: item.size_snapshot || "",
+          Qty: 0,
+          ImageURL: item.image_url_snapshot || "",
+        };
+      }
+      acc[key].Qty += item.qty || item.quantity || 0;
+      return acc;
+    }, {} as Record<string, any>);
+
+    const variantSheetData = Object.values(variantDetails);
+
+    // --- 3. Prepare data for ReadMe sheet ---
+    const readMeSheetData = [
+      ["How to use:"],
+      ["1) Agent_Order_Summary = one row per product (all variants grouped)."],
+      [
+        "   - Agent fills: PricePerUnit_CNY and Seller→Agent_Ship_CNY.",
+      ],
+      [
+        "   - Subtotal/Total in CNY and BDT are auto-calculated (formulas need to be set up in Excel).",
+      ],
+      ["2) Variant_Details = per-variant breakdown used for packing/verification."],
       [],
-      ["Generated at", new Date().toLocaleString()],
+      ["CNY_to_BDT_Rate", 15.0], // Default Rate
     ];
 
+    // --- 4. Use SheetJS to create and download the multi-sheet XLSX file ---
     const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.json_to_sheet(summarySheetData);
+    const wsVariants = XLSX.utils.json_to_sheet(variantSheetData);
+    const wsReadMe = XLSX.utils.aoa_to_sheet(readMeSheetData);
 
-    const ws1 = XLSX.utils.json_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, ws1, "Agent_Order_Summary");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Agent_Order_Summary");
+    XLSX.utils.book_append_sheet(wb, wsVariants, "Variant_Details");
+    XLSX.utils.book_append_sheet(wb, wsReadMe, "ReadMe");
 
-    const ws2 = XLSX.utils.json_to_sheet(variantData);
-    XLSX.utils.book_append_sheet(wb, ws2, "Variant_Details");
-
-    const ws3 = XLSX.utils.aoa_to_sheet(readmeData);
-    XLSX.utils.book_append_sheet(wb, ws3, "ReadMe");
-
-    XLSX.writeFile(wb, `Batch_${batch.id}_Export.xlsx`);
+    XLSX.writeFile(wb, `Batch_${batch.id}_Agent_Order_List.xlsx`);
     alert("Batch exported successfully");
+  };
+
+  const handleAddAllUnbatchedOrders = async () => {
+    if (isAddingOrders) return;
+
+    try {
+      setIsAddingOrders(true);
+
+      // Get all order IDs that are not in any batch
+      const allBatchedOrderIds = batches.flatMap((b) => b.order_ids || []);
+      const unbatchedOrderIds = orders
+        .filter((order) => !allBatchedOrderIds.includes(order.id))
+        .map((order) => order.id);
+
+      if (unbatchedOrderIds.length === 0) {
+        alert("All orders are already in batches");
+        return;
+      }
+
+      // Merge existing order IDs with new ones
+      const updatedOrderIds = [
+        ...new Set([...(batch.order_ids || []), ...unbatchedOrderIds]),
+      ];
+
+      // Call API to update the batch
+      await batchesAPI.update(batch.id, {
+        order_ids: updatedOrderIds,
+      });
+
+      // Refresh batches and orders from API
+      if (fetchBatches) {
+        await fetchBatches();
+      }
+      if (fetchOrders) {
+        await fetchOrders();
+      }
+
+      alert(
+        `Added ${unbatchedOrderIds.length} unbatched orders to Batch #${batch.id}`
+      );
+    } catch (error) {
+      console.error("Error adding orders to batch:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to add orders to batch. Please try again."
+      );
+    } finally {
+      setIsAddingOrders(false);
+    }
   };
 
   return (
@@ -144,6 +251,15 @@ export default function BatchDetailsPage() {
           <h1 className="text-2xl font-semibold">Batch #{batch.id}</h1>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleAddAllUnbatchedOrders}
+            loading={isAddingOrders}
+            disabled={isAddingOrders}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add All Unbatched Orders
+          </Button>
           <Button variant="secondary" onClick={() => window.print()}>
             <Printer className="w-4 h-4 mr-2" />
             Print

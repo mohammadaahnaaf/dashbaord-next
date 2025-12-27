@@ -6,7 +6,7 @@ import { getSettings } from "@/utils/local-storage";
 import { productsAPI, customersAPI, ordersAPI } from "@/utils/api-client";
 // import { showToast } from "@/components/utils";
 import { Product, Customer } from "@/types";
-import { ArrowLeft, Plus, X, Search } from "lucide-react";
+import { ArrowLeft, Plus, X, Search, Package } from "lucide-react";
 import { formatBDT } from "@/components/utils";
 import { usePathaoLocations } from "@/hooks/use-pathao-locations";
 
@@ -67,6 +67,10 @@ export default function CreateOrderPage() {
   // Customer autocomplete
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const customerInputRef = useRef<HTMLDivElement>(null);
+
+  // Product search autocomplete
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const productSearchRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<OrderFormData>({
     customer_name: "",
@@ -247,6 +251,17 @@ export default function CreateOrderPage() {
     customer.name.toLowerCase().includes(formData.customer_name.toLowerCase())
   );
 
+  // Filter products for search
+  const filteredProducts = products.filter((product: Product) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.code.toLowerCase().includes(query) ||
+      product.id.toString().includes(query)
+    );
+  });
+
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -255,6 +270,12 @@ export default function CreateOrderPage() {
         !customerInputRef.current.contains(event.target as Node)
       ) {
         setShowCustomerSuggestions(false);
+      }
+      if (
+        productSearchRef.current &&
+        !productSearchRef.current.contains(event.target as Node)
+      ) {
+        setShowProductSuggestions(false);
       }
     };
 
@@ -272,6 +293,15 @@ export default function CreateOrderPage() {
       setShowCustomerSuggestions(false);
     }
   }, [formData.customer_name, filteredCustomers.length]);
+
+  // Show product suggestions when typing
+  useEffect(() => {
+    if (searchQuery.length > 0 && filteredProducts.length > 0) {
+      setShowProductSuggestions(true);
+    } else {
+      setShowProductSuggestions(false);
+    }
+  }, [searchQuery, filteredProducts.length]);
 
   // Handle customer selection from suggestions
   const handleCustomerSelect = (customer: (typeof customers)[0]) => {
@@ -299,6 +329,47 @@ export default function CreateOrderPage() {
         size_snapshot: undefined,
       } as OrderItemForm,
     ]);
+  };
+
+  // Handle selecting a product with variant from search
+  const handleSelectProductWithVariant = (
+    product: Product,
+    color?: string,
+    size?: string
+  ) => {
+    const { colors, sizes } = getProductVariants(product.id);
+
+    // Determine price - check if variant has price override
+    let price = product.sell_price_bdt;
+    let imageUrl = product.image_url;
+
+    if (color && product.variant_groups) {
+      const variantGroup = product.variant_groups.find(
+        (vg) => vg.color === color
+      );
+      if (variantGroup?.sell_price_override) {
+        price = variantGroup.sell_price_override;
+      }
+      if (variantGroup?.image_url) {
+        imageUrl = variantGroup.image_url;
+      }
+    }
+
+    const newItem: OrderItemForm = {
+      product_id: product.id,
+      product_name_snapshot: product.name,
+      image_url_snapshot: imageUrl,
+      sell_price_bdt_snapshot: price,
+      qty: 1,
+      quantity: 1,
+      price: price,
+      color_snapshot: color || (colors.length > 0 ? colors[0] : undefined),
+      size_snapshot: size || (sizes.length > 0 ? sizes[0] : undefined),
+    };
+
+    setSelectedProducts((prev) => [...prev, newItem]);
+    setSearchQuery("");
+    setShowProductSuggestions(false);
   };
 
   const handleRemoveProduct = (index: number) => {
@@ -490,16 +561,6 @@ export default function CreateOrderPage() {
     };
   };
 
-  const filteredProducts = products.filter((product: Product) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      product.name.toLowerCase().includes(query) ||
-      product.code.toLowerCase().includes(query) ||
-      product.id.toString().includes(query)
-    );
-  });
-
   const handleCreateOrder = async () => {
     if (
       !formData.customer_name ||
@@ -616,13 +677,424 @@ export default function CreateOrderPage() {
         <h1 className="text-2xl font-semibold">Create New Order</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Customer & Delivery */}
+      <div className="grid gap-6">
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
+
+            {/* Product Search */}
+            <div className="mb-4 relative" ref={productSearchRef}>
+              <Input
+                placeholder="Search product by ID, name, or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (searchQuery.length > 0 && filteredProducts.length > 0) {
+                    setShowProductSuggestions(true);
+                  }
+                }}
+                icon={<Search className="w-5 h-5 text-gray-400" />}
+              />
+              {showProductSuggestions && filteredProducts.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+                  {filteredProducts.slice(0, 20).map((product: Product) => {
+                    const { colors, sizes } = getProductVariants(product.id);
+                    const hasVariants = colors.length > 0 || sizes.length > 0;
+
+                    return (
+                      <div
+                        key={product.id}
+                        className="border-b border-gray-100 last:border-b-0"
+                      >
+                        {/* Main product option */}
+                        <div
+                          onClick={() => {
+                            handleSelectProductWithVariant(product);
+                          }}
+                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {product.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={product.image_url}
+                                alt={product.name}
+                                className="w-12 h-12 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-200 rounded-md flex items-center justify-center">
+                                <Package className="w-6 h-6 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-gray-900 truncate">
+                                {product.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Code: {product.code} •{" "}
+                                {formatBDT(product.sell_price_bdt)}
+                              </div>
+                              {hasVariants && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  {colors.length > 0 &&
+                                    `${colors.length} color${
+                                      colors.length > 1 ? "s" : ""
+                                    }`}
+                                  {colors.length > 0 &&
+                                    sizes.length > 0 &&
+                                    " • "}
+                                  {sizes.length > 0 &&
+                                    `${sizes.length} size${
+                                      sizes.length > 1 ? "s" : ""
+                                    }`}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Variant options if product has variants */}
+                        {hasVariants && (
+                          <div className="bg-gray-50 border-t border-gray-100">
+                            {colors.length > 0 && sizes.length > 0
+                              ? // Show all color-size combinations
+                                colors.flatMap((color) =>
+                                  sizes.map((size) => (
+                                    <div
+                                      key={`${product.id}-${color}-${size}`}
+                                      onClick={() => {
+                                        handleSelectProductWithVariant(
+                                          product,
+                                          color,
+                                          size
+                                        );
+                                      }}
+                                      className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-gray-700">
+                                          {color} / {size}
+                                        </span>
+                                        <span className="text-gray-500 text-xs">
+                                          {formatBDT(product.sell_price_bdt)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                )
+                              : colors.length > 0
+                              ? // Only colors, no sizes
+                                colors.map((color) => (
+                                  <div
+                                    key={`${product.id}-${color}`}
+                                    onClick={() => {
+                                      handleSelectProductWithVariant(
+                                        product,
+                                        color
+                                      );
+                                    }}
+                                    className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-700">
+                                        {color}
+                                      </span>
+                                      <span className="text-gray-500 text-xs">
+                                        {formatBDT(product.sell_price_bdt)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))
+                              : // Only sizes, no colors
+                                sizes.map((size) => (
+                                  <div
+                                    key={`${product.id}-${size}`}
+                                    onClick={() => {
+                                      handleSelectProductWithVariant(
+                                        product,
+                                        undefined,
+                                        size
+                                      );
+                                    }}
+                                    className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-700">
+                                        Size: {size}
+                                      </span>
+                                      <span className="text-gray-500 text-xs">
+                                        {formatBDT(product.sell_price_bdt)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Add Product Button */}
+            {selectedProducts.length > 0 && (
+              <Button
+                onClick={handleAddProduct}
+                variant="secondary"
+                className="w-full mb-4"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            )}
+
+            {/* Added Products Table */}
+            <div className="mb-4">
+              {selectedProducts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No products added yet</p>
+                  <Button
+                    onClick={handleAddProduct}
+                    className="mt-4"
+                    variant="secondary"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Products
+                  </Button>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Image
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Product
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Color
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Size
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Qty
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {selectedProducts.map((item, index) => {
+                          const { colors, sizes } = getProductVariants(
+                            item.product_id
+                          );
+
+                          return (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {item.image_url_snapshot ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.image_url_snapshot}
+                                    alt={item.product_name_snapshot}
+                                    className="w-12 h-12 object-cover rounded border"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-gray-200 rounded border flex items-center justify-center text-xs text-gray-500">
+                                    <Package className="w-6 h-6 text-gray-400" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {item.product_id === 0 ? (
+                                  <Select
+                                    value="0"
+                                    onChange={(e) =>
+                                      handleProductChange(
+                                        index,
+                                        parseInt(e.target.value)
+                                      )
+                                    }
+                                    options={[
+                                      { value: "0", label: "Select product" },
+                                      ...filteredProducts.map(
+                                        (product: Product) => ({
+                                          value: product.id.toString(),
+                                          label: `${product.name} (${formatBDT(
+                                            product.sell_price_bdt
+                                          )})`,
+                                        })
+                                      ),
+                                    ]}
+                                  />
+                                ) : (
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {item.product_name_snapshot}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {item.product_id === 0 ? (
+                                  <span className="text-sm text-gray-400">
+                                    -
+                                  </span>
+                                ) : colors.length > 0 ? (
+                                  <Select
+                                    value={item.color_snapshot || ""}
+                                    onChange={(e) =>
+                                      handleVariantChange(
+                                        index,
+                                        "color",
+                                        e.target.value
+                                      )
+                                    }
+                                    options={[
+                                      { value: "", label: "Select color" },
+                                      ...colors.map((color) => ({
+                                        value: color,
+                                        label: color,
+                                      })),
+                                    ]}
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-400">
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {item.product_id === 0 ? (
+                                  <span className="text-sm text-gray-400">
+                                    -
+                                  </span>
+                                ) : sizes.length > 0 ? (
+                                  <Select
+                                    value={item.size_snapshot || ""}
+                                    onChange={(e) =>
+                                      handleVariantChange(
+                                        index,
+                                        "size",
+                                        e.target.value
+                                      )
+                                    }
+                                    options={[
+                                      { value: "", label: "Select size" },
+                                      ...sizes.map((size) => ({
+                                        value: size,
+                                        label: size,
+                                      })),
+                                    ]}
+                                  />
+                                ) : (
+                                  <span className="text-sm text-gray-400">
+                                    -
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  placeholder="Price"
+                                  value={
+                                    item.price ||
+                                    item.sell_price_bdt_snapshot ||
+                                    ""
+                                  }
+                                  onChange={(e) =>
+                                    handlePriceChange(
+                                      index,
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="text-sm w-24"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <Input
+                                  type="number"
+                                  placeholder="Qty"
+                                  value={item.quantity || item.qty || 1}
+                                  onChange={(e) =>
+                                    handleQuantityChange(
+                                      index,
+                                      parseInt(e.target.value) || 1
+                                    )
+                                  }
+                                  className="text-sm w-20"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  onClick={() => handleRemoveProduct(index)}
+                                  className="p-1 hover:bg-red-50 rounded-full text-red-500 transition-colors"
+                                  title="Remove product"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Order Summary */}
+            <div className="border-t pt-4 mt-6 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-medium">{formatBDT(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Delivery</span>
+                <span className="font-medium">{formatBDT(deliveryCharge)}</span>
+              </div>
+              <div className="mt-3">
+                <Input
+                  label="Advance (BDT)"
+                  type="number"
+                  value={advanceAmount || ""}
+                  onChange={(e) =>
+                    setAdvanceAmount(parseFloat(e.target.value) || 0)
+                  }
+                />
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="text-lg font-semibold text-blue-600">DUE</span>
+                <span className="text-lg font-bold text-blue-600">
+                  {formatBDT(due)}
+                </span>
+              </div>
+
+              {/* Estimated Delivery Date */}
+              <div className="mt-4">
+                <Input
+                  label="Estimated Delivery Date"
+                  type="date"
+                  value={estimatedDeliveryDate}
+                  onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">Customer & Delivery</h2>
 
-            <div className="space-y-4">
+            <div className="space-y-4 grid grid-cols-2 gap-2">
               <div ref={customerInputRef} className="relative">
                 <Input
                   label="Customer Name"
@@ -676,7 +1148,7 @@ export default function CreateOrderPage() {
                 required
               />
 
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
                   Address
                 </label>
@@ -696,7 +1168,7 @@ export default function CreateOrderPage() {
             </div>
 
             <div className="mt-6">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">
+              <h3 className="text-lg font-semibold mb-3">
                 Pathao Location
               </h3>
               {pathaoError && (
@@ -707,7 +1179,7 @@ export default function CreateOrderPage() {
                   </p>
                 </div>
               )}
-              <div className="space-y-4">
+              <div className="space-y-4 grid grid-cols-3 gap-2">
                 <Select
                   label="City"
                   value={formData.pathao_city_id?.toString() || ""}
@@ -874,261 +1346,14 @@ export default function CreateOrderPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Right Column: Order Items */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold mb-4">Order Items</h2>
-
-            {/* Product Search */}
-            <div className="mb-4">
-              <Input
-                placeholder="Search product by ID or name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                icon={<Search className="w-5 h-5 text-gray-400" />}
-              />
-            </div>
-
-            {/* Added Products */}
-            <div className="space-y-3 mb-4">
-              {selectedProducts.map((item, index) => {
-                const { colors, sizes } = getProductVariants(item.product_id);
-                const variantLabel =
-                  item.color_snapshot && item.size_snapshot
-                    ? `${item.color_snapshot} - ${item.size_snapshot}`
-                    : item.color_snapshot || item.size_snapshot || "";
-
-                // Debug: Log product and variants for troubleshooting
-                if (item.product_id > 0) {
-                  const product = products.find(
-                    (p: Product) => p.id === item.product_id
-                  );
-                  if (product) {
-                    console.log(
-                      `[Product ${item.product_id}] ${product.name}:`,
-                      {
-                        variant_groups: product.variant_groups,
-                        colors,
-                        sizes,
-                        hasVariants: colors.length > 0 || sizes.length > 0,
-                      }
-                    );
-                  }
-                }
-
-                return (
-                  <div
-                    key={index}
-                    className="flex items-start gap-3 p-3 border rounded-lg"
-                  >
-                    {item.image_url_snapshot ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.image_url_snapshot}
-                        alt={item.product_name_snapshot}
-                        className="w-12 h-12 object-cover rounded border"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-200 rounded border flex items-center justify-center text-xs text-gray-500">
-                        {variantLabel.slice(0, 5) || "N/A"}
-                      </div>
-                    )}
-
-                    <div className="flex-1 min-w-0 space-y-2">
-                      {item.product_id === 0 ? (
-                        <Select
-                          value="0"
-                          onChange={(e) =>
-                            handleProductChange(index, parseInt(e.target.value))
-                          }
-                          options={[
-                            { value: "0", label: "Select product" },
-                            ...filteredProducts.map((product: Product) => ({
-                              value: product.id.toString(),
-                              label: `${product.name} (${formatBDT(
-                                product.sell_price_bdt
-                              )})`,
-                            })),
-                          ]}
-                        />
-                      ) : (
-                        <>
-                          <p className="font-medium text-sm truncate">
-                            {item.product_name_snapshot}
-                          </p>
-                          {(colors.length > 0 || sizes.length > 0) && (
-                            <div
-                              className={`grid gap-2 ${
-                                colors.length > 0 && sizes.length > 0
-                                  ? "grid-cols-2"
-                                  : "grid-cols-1"
-                              }`}
-                            >
-                              {colors.length > 0 && (
-                                <Select
-                                  label="Color"
-                                  value={item.color_snapshot || ""}
-                                  onChange={(e) =>
-                                    handleVariantChange(
-                                      index,
-                                      "color",
-                                      e.target.value
-                                    )
-                                  }
-                                  options={[
-                                    { value: "", label: "Select color" },
-                                    ...colors.map((color) => ({
-                                      value: color,
-                                      label: color,
-                                    })),
-                                  ]}
-                                />
-                              )}
-                              {sizes.length > 0 && (
-                                <Select
-                                  label="Size"
-                                  value={item.size_snapshot || ""}
-                                  onChange={(e) =>
-                                    handleVariantChange(
-                                      index,
-                                      "size",
-                                      e.target.value
-                                    )
-                                  }
-                                  options={[
-                                    { value: "", label: "Select size" },
-                                    ...sizes.map((size) => ({
-                                      value: size,
-                                      label: size,
-                                    })),
-                                  ]}
-                                />
-                              )}
-                            </div>
-                          )}
-                          {colors.length === 0 && sizes.length === 0 && (
-                            <p className="text-xs text-gray-500 italic">
-                              No variants available for this product
-                            </p>
-                          )}
-                        </>
-                      )}
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          type="number"
-                          placeholder="Price"
-                          value={
-                            item.price || item.sell_price_bdt_snapshot || ""
-                          }
-                          onChange={(e) =>
-                            handlePriceChange(
-                              index,
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="text-sm"
-                        />
-                        <Input
-                          type="number"
-                          placeholder="Qty"
-                          value={item.quantity || item.qty || 1}
-                          onChange={(e) =>
-                            handleQuantityChange(
-                              index,
-                              parseInt(e.target.value) || 1
-                            )
-                          }
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleRemoveProduct(index)}
-                      className="p-1 hover:bg-red-50 rounded-full text-red-500"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                );
-              })}
-
-              {selectedProducts.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No products added yet</p>
-                  <Button
-                    onClick={handleAddProduct}
-                    className="mt-4"
-                    variant="secondary"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Product
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Add Product Button */}
-            {selectedProducts.length > 0 && (
-              <Button
-                onClick={handleAddProduct}
-                variant="secondary"
-                className="w-full"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Product
-              </Button>
-            )}
-
-            {/* Order Summary */}
-            <div className="border-t pt-4 mt-6 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Subtotal</span>
-                <span className="font-medium">{formatBDT(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Delivery</span>
-                <span className="font-medium">{formatBDT(deliveryCharge)}</span>
-              </div>
-              <div className="mt-3">
-                <Input
-                  label="Advance (BDT)"
-                  type="number"
-                  value={advanceAmount || ""}
-                  onChange={(e) =>
-                    setAdvanceAmount(parseFloat(e.target.value) || 0)
-                  }
-                />
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-lg font-semibold text-blue-600">DUE</span>
-                <span className="text-lg font-bold text-blue-600">
-                  {formatBDT(due)}
-                </span>
-              </div>
-
-              {/* Estimated Delivery Date */}
-              <div className="mt-4">
-                <Input
-                  label="Estimated Delivery Date"
-                  type="date"
-                  value={estimatedDeliveryDate}
-                  onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
-                />
-              </div>
-
-              {/* Save Order Button */}
-              <Button
-                onClick={handleCreateOrder}
-                disabled={isCreating}
-                className="w-full mt-4 bg-green-600 hover:bg-green-700"
-              >
-                {isCreating ? "Saving..." : "Save Order"}
-              </Button>
-            </div>
-          </div>
+          {/* Save Order Button */}
+          <Button
+            onClick={handleCreateOrder}
+            disabled={isCreating}
+            className="w-full mt-4 bg-green-600 hover:bg-green-700"
+          >
+            {isCreating ? "Saving..." : "Save Order"}
+          </Button>
         </div>
       </div>
     </div>

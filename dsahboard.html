@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --sidebar-width: 250px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .page { display: none; }
+        .page.active { display: block; }
+        .sidebar-link.active {
+            background-color: #3b82f6; /* bg-blue-600 */
+            color: white;
+        }
+        .sidebar-link.active svg {
+            color: white;
+        }
+        .animate-enter {
+            animation: enter 0.2s ease-out;
+        }
+        .animate-leave {
+            animation: leave 0.2s ease-in forwards;
+        }
+        @keyframes enter {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes leave {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.95); }
+        }
+        .status-chip {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        .status-Pending { background-color: #f59e0b; color: white; }
+        .status-Processing { background-color: #3b82f6; color: white; }
+        .status-Packing { background-color: #8b5cf6; color: white; }
+        .status-Ready { background-color: #10b981; color: white; }
+        .status-InTransit { background-color: #6366f1; color: white; }
+        .status-Delivered { background-color: #14532d; color: white; }
+        .status-Cancelled { background-color: #ef4444; color: white; }
+        .status-Returned { background-color: #f97316; color: white; }
+
+        .pathao-status-chip {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .pathao-Pickup-Requested { background-color: #eab308; color: #422006; }
+        .pathao-In-Transit { background-color: #3b82f6; color: white; }
+        .pathao-Delivered { background-color: #22c55e; color: white; }
+        
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 antialiased">
+    <div id="app-container">
+        <!-- LOGIN SCREEN -->
+        <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gray-900">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-sm">
+                <h2 class="text-3xl font-bold text-center text-gray-800 mb-2">Welcome</h2>
+                <p class="text-center text-gray-500 mb-6">Log in to your dashboard</p>
+                <form id="login-form">
+                     <div class="mb-4">
+                        <label for="role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <select id="role" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="admin">Admin</option>
+                            <option value="moderator" selected>Moderator</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                        <input type="text" id="username" value="admin" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="password" value="password" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300">Login</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- MAIN APPLICATION -->
+        <div id="main-app" class="hidden">
+            <div class="flex h-screen bg-gray-100">
+                <!-- SIDEBAR -->
+                <aside class="w-[var(--sidebar-width)] bg-gray-800 text-white flex flex-col fixed h-full">
+                    <div class="p-4 border-b border-gray-700">
+                        <h1 id="app-name" class="text-xl font-bold text-center">OMS</h1>
+                    </div>
+                    <nav id="sidebar-nav" class="flex-grow p-2">
+                        <!-- Links injected by JS -->
+                    </nav>
+                    <div id="sidebar-footer" class="p-2 border-t border-gray-700">
+                        <!-- Settings and Logout injected by JS -->
+                    </div>
+                </aside>
+
+                <!-- MAIN CONTENT -->
+                <main class="flex-1 ml-[var(--sidebar-width)] overflow-y-auto">
+                    <div id="content-area" class="p-6">
+                        <!-- Page content will be injected here -->
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MODAL/DRAWER CONTAINER -->
+    <div id="modal-container"></div>
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2"></div>
+
+
+<script type="module">
+    // --- MOCK DATA & STATE MANAGEMENT ---
+    const state = {
+        currentUser: { role: null },
+        editingOrderId: null,
+        prefilledCustomer: null,
+        products: [
+            { id: 101, code: 'T-83472', name: 'Premium Cotton T-Shirt', description: 'Experience unparalleled comfort and style with our Premium Cotton T-Shirt. Made from 100% Supima cotton, it offers a soft, breathable feel that lasts all day.', source_link: 'http://supplier.com/ts001', main_image_url: 'https://placehold.co/400x400/3b82f6/FFFFFF?text=T-Shirt', base_price_bdt: 350, sell_price_bdt: 750, active: true, variants: [
+                { id: 201, product_id: 101, color: 'Black', size: 'M', variant_image_url: 'https://placehold.co/400x400/111827/FFFFFF?text=Black+M', sell_price_bdt: null },
+                { id: 202, product_id: 101, color: 'Black', size: 'L', variant_image_url: 'https://placehold.co/400x400/111827/FFFFFF?text=Black+L', sell_price_bdt: 800 },
+                { id: 203, product_id: 101, color: 'White', size: 'M', variant_image_url: 'https://placehold.co/400x400/FFFFFF/111827?text=White+M', sell_price_bdt: null },
+            ]},
+            { id: 102, code: 'S-29384', name: 'Slim-Fit Denim Jeans', description: 'Our Slim-Fit Denim Jeans are crafted for the modern look. With a touch of stretch for comfort and a classic five-pocket design, they are perfect for any occasion.', source_link: 'http://supplier.com/jn005', main_image_url: 'https://placehold.co/400x400/1e40af/FFFFFF?text=Jeans', base_price_bdt: 800, sell_price_bdt: 1600, active: true, variants: [
+                { id: 204, product_id: 102, color: 'Blue', size: '32', variant_image_url: 'https://placehold.co/400x400/1d4ed8/FFFFFF?text=Blue+32', sell_price_bdt: null },
+                { id: 205, product_id: 102, color: 'Blue', size: '34', variant_image_url: 'https://placehold.co/400x400/1d4ed8/FFFFFF?text=Blue+34', sell_price_bdt: null },
+            ]},
+            { id: 103, code: 'F-56321', name: 'Fleece Hoodie', description: 'Stay warm and cozy with our Fleece Hoodie. Featuring a soft brushed interior and a durable exterior, it\'s the ideal companion for chilly days.', source_link: 'http://supplier.com/hd002', main_image_url: 'https://placehold.co/400x400/4b5563/FFFFFF?text=Hoodie', base_price_bdt: 650, sell_price_bdt: 1400, active: false, variants: [
+                 { id: 206, product_id: 103, color: 'Grey', size: 'L', variant_image_url: 'https://placehold.co/400x400/6b7280/FFFFFF?text=Grey+L', sell_price_bdt: null },
+            ]},
+             { id: 104, code: 'C-11223', name: 'Simple Cap', description: 'A simple, stylish cap for everyday wear.', source_link: 'http://supplier.com/cap01', main_image_url: 'https://placehold.co/400x400/84cc16/FFFFFF?text=Cap', base_price_bdt: 200, sell_price_bdt: 450, active: true, variants: []},
+        ],
+        customers: [
+            { id: 301, name: 'Rahim Sheikh', phone: '01700112233', address_default: 'House 12, Road 5, Dhanmondi, Dhaka' },
+            { id: 302, name: 'Karina Ahmed', phone: '01800445566', address_default: 'Apt 3B, Block C, Bashundhara R/A, Dhaka' },
+        ],
+        orders: [
+            { id: 2024001, customer_id: 301, created_at: '2025-10-19T10:30:00Z', address: 'House 12, Road 5, Dhanmondi, Dhaka', delivery_charge_bdt: 60, advance_bdt: 500, due_bdt: 2960, pathao_city_name: 'Dhaka', pathao_zone_name: 'Dhanmondi', pathao_area_name: 'Shankar', eta_start: '2025-11-18', eta_end: '2025-11-18', status: 'InTransit', pathao_tracking_code: 'PA123456789BD', pathao_order_id: 'POID98765', pathao_status: 'In-Transit', last_synced_at: '2025-10-20T14:00:00Z', items: [
+                { id: 401, order_id: 2024001, product_id: 101, variant_id: 201, qty: 1, product_name_snapshot: 'Premium Cotton T-Shirt', color_snapshot: 'Black', size_snapshot: 'M', product_link_snapshot: 'http://supplier.com/ts001', image_url_snapshot: 'https://placehold.co/400x400/111827/FFFFFF?text=Black+M', sell_price_bdt_snapshot: 750, base_price_bdt_snapshot: 350 },
+                { id: 402, order_id: 2024001, product_id: 102, variant_id: 204, qty: 1, product_name_snapshot: 'Slim-Fit Denim Jeans', color_snapshot: 'Blue', size_snapshot: '32', product_link_snapshot: 'http://supplier.com/jn005', image_url_snapshot: 'https://placehold.co/400x400/1d4ed8/FFFFFF?text=Blue+32', sell_price_bdt_snapshot: 1600, base_price_bdt_snapshot: 800 },
+            ]},
+            { id: 2024002, customer_id: 302, created_at: '2025-10-20T11:00:00Z', address: 'Apt 3B, Block C, Bashundhara R/A, Dhaka', delivery_charge_bdt: 80, advance_bdt: 0, due_bdt: 1680, pathao_city_name: 'Dhaka', pathao_zone_name: 'Bashundhara', pathao_area_name: 'Block C', eta_start: '2025-11-19', eta_end: '2025-11-19', status: 'Packing', pathao_tracking_code: null, pathao_order_id: null, pathao_status: null, last_synced_at: null, items: [
+                { id: 403, order_id: 2024002, product_id: 101, variant_id: 202, qty: 2, product_name_snapshot: 'Premium Cotton T-Shirt', color_snapshot: 'Black', size_snapshot: 'L', product_link_snapshot: 'http://supplier.com/ts001', image_url_snapshot: 'https://placehold.co/400x400/111827/FFFFFF?text=Black+L', sell_price_bdt_snapshot: 800, base_price_bdt_snapshot: 350 },
+            ]},
+             { id: 2024003, customer_id: 301, created_at: '2025-10-20T12:00:00Z', address: 'House 12, Road 5, Dhanmondi, Dhaka', delivery_charge_bdt: 60, advance_bdt: 1000, due_bdt: 1410, pathao_city_name: 'Dhaka', pathao_zone_name: 'Dhanmondi', pathao_area_name: 'Shankar', eta_start: '2025-11-19', eta_end: '2025-11-19', status: 'Pending', pathao_tracking_code: null, pathao_order_id: null, pathao_status: null, last_synced_at: null, items: [
+                { id: 404, order_id: 2024003, product_id: 101, variant_id: 203, qty: 3, product_name_snapshot: 'Premium Cotton T-Shirt', color_snapshot: 'White', size_snapshot: 'M', product_link_snapshot: 'http://supplier.com/ts001', image_url_snapshot: 'https://placehold.co/400x400/FFFFFF/111827?text=White+M', sell_price_bdt_snapshot: 750, base_price_bdt_snapshot: 350 },
+            ]},
+        ],
+        batches: [
+            { id: 501, note: 'Urgent Pre-orders', created_at: '2025-10-20T15:00:00Z', created_by: 'admin', order_ids: [2024001, 2024002] }
+        ],
+        settings: {
+            appName: 'Pathao OMS',
+            delivery_charge_map: { dhaka: 60, sub_dhaka: 100, outside: 130 },
+            packing_completion_status: 'Ready',
+            pathao: { client_id: '', client_secret: '', webhook_url: '', sandbox: true }
+        },
+        pathaoCache: {
+            cities: [ { id: 1, name: 'Dhaka' }, { id: 2, name: 'Chittagong' }, { id: 3, name: 'Sylhet' }],
+            zones: {
+                1: [ { id: 101, name: 'Dhanmondi' }, { id: 102, name: 'Gulshan' }, { id: 103, name: 'Bashundhara' } ],
+                2: [ { id: 201, name: 'Agrabad' }, { id: 202, name: 'Nasirabad' } ],
+            },
+            areas: {
+                101: [ { id: 10101, name: 'Shankar' }, { id: 10102, name: 'Jhigatola' } ],
+                102: [ { id: 10201, name: 'Gulshan 1' }, { id: 10202, name: 'Gulshan 2' } ],
+                103: [ { id: 10301, name: 'Block A' }, { id: 10302, name: 'Block C' } ],
+                201: [ { id: 20101, name: 'Commercial Area'}],
+            }
+        },
+    };
+
+    // --- GEMINI API UTILITY ---
+    async function callGeminiAPI(prompt, button) {
+        // This is a mock function. In a real app, you would make a fetch call
+        // to the Gemini API here.
+        console.log("Calling Gemini API with prompt:", prompt);
+
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="loader"></span>';
+        button.disabled = true;
+
+        return new Promise(resolve => {
+            setTimeout(() => {
+                let mockResponse = "This is a fantastic product that will surely delight you. It's crafted with the finest materials and designed for durability and style.";
+                if (prompt.includes("follow-up message")) {
+                    mockResponse = `Hi [Customer Name], we have an update on your order #[Order ID]. It has been processed and is now being prepared for shipping. We'll notify you again once it's on its way. Thank you for your patience!`;
+                }
+                if (prompt.includes("batch note")) {
+                    mockResponse = `Batch of pre-orders for Dhaka, mostly T-shirts and Jeans. To be shipped by end of week.`
+                }
+                button.innerHTML = originalText;
+                button.disabled = false;
+                resolve(mockResponse);
+            }, 1500); // Simulate network delay
+        });
+    }
+
+
+    // --- UTILS ---
+    const formatBDT = (amount) => `৳${new Intl.NumberFormat('en-IN').format(amount)}`;
+    const formatDate = (dateString) => new Date(dateString).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const showToast = (message, type = 'success') => {
+        const colors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            info: 'bg-blue-500',
+        };
+        const toast = document.createElement('div');
+        toast.className = `animate-enter text-white px-4 py-2 rounded-md shadow-lg ${colors[type]}`;
+        toast.textContent = message;
+        document.getElementById('toast-container').appendChild(toast);
+        setTimeout(() => {
+            toast.classList.remove('animate-enter');
+            toast.classList.add('animate-leave');
+            toast.addEventListener('animationend', () => toast.remove());
+        }, 3000);
+    };
+
+    function copyToClipboard(text, successCallback) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) successCallback();
+            else showToast('Failed to copy link.', 'error');
+        } catch (err) {
+             showToast('Failed to copy link.', 'error');
+        }
+        document.body.removeChild(textArea);
+    }
+
+
+    // --- PAGE TEMPLATES ---
+    const pages = {
+        catalog: `
+            <div class="animate-enter">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Product Catalog</h2>
+                    <button id="add-product-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
+                        <i data-lucide="plus" class="w-5 h-5"></i> Add Product
+                    </button>
+                </div>
+                <!-- Add Product Form (hidden by default) -->
+                <div id="add-product-form-container" class="hidden bg-white p-6 rounded-lg shadow-md mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Add New Product</h3>
+                    <form id="product-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="hidden" id="product-id-input">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Product Name</label>
+                                <input type="text" name="name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Product Code</label>
+                                <input type="text" name="code" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100" readonly placeholder="Will be auto-generated">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">Source Link</label>
+                                <input type="url" name="source_link" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Base Price (BDT)</label>
+                                <input type="number" name="base_price_bdt" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sell Price (BDT)</label>
+                                <input type="number" name="sell_price_bdt" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700">Main Image</label>
+                                <input type="file" name="main_image_url" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            </div>
+                            <div class="md:col-span-2">
+                                <div class="flex justify-between items-center">
+                                    <label class="block text-sm font-medium text-gray-700">Description</label>
+                                    <button type="button" id="generate-description-btn" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md hover:bg-indigo-200">✨ Generate with AI</button>
+                                </div>
+                                <textarea name="description" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                            </div>
+                            <div class="flex items-center">
+                                 <input type="checkbox" name="active" checked class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                 <label class="ml-2 block text-sm text-gray-900">Active</label>
+                            </div>
+                        </div>
+                        <div class="md:col-span-2 border-t mt-6 pt-4">
+                            <h4 class="text-lg font-semibold">Variant Groups</h4>
+                            <p class="text-sm text-gray-500 mb-3">Add a group for each color. Enter all available sizes for that color, separated by commas.</p>
+                            <div id="variant-groups-container" class="space-y-4">
+                                <!-- JS will inject variant group cards here -->
+                            </div>
+                            <button id="add-variant-group-btn" class="mt-4 text-sm bg-gray-200 text-gray-800 px-3 py-1 rounded-md hover:bg-gray-300 flex items-center gap-1">
+                               <i data-lucide="plus" class="w-4 h-4"></i> Add Color Group
+                            </button>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3 border-t pt-4">
+                            <button id="cancel-product-form" type="button" class="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300">Cancel</button>
+                            <button id="save-product-form" type="submit" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Save Product</button>
+                        </div>
+                    </form>
+                </div>
+                <!-- Product List -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <input type="text" id="product-search" placeholder="Search by name or code..." class="w-full mb-4 px-3 py-2 border rounded-md">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variants</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pricing (Base/Sell)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="product-list-body" class="bg-white divide-y divide-gray-200">
+                                <!-- JS will render rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `,
+        'create-order': `
+            <div class="animate-enter" id="create-order-page">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Create New Order</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left: Customer & Delivery -->
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md space-y-4">
+                        <h3 class="text-xl font-semibold border-b pb-2">Customer & Delivery</h3>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Customer Name</label>
+                            <input type="text" id="co-customer-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Phone</label>
+                            <input type="tel" id="co-customer-phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Address</label>
+                            <textarea id="co-customer-address" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></textarea>
+                        </div>
+                        <h4 class="text-lg font-semibold pt-2">Pathao Location</h4>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">District</label>
+                            <select id="co-pathao-city" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">Zone</label>
+                            <select id="co-pathao-zone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" disabled></select>
+                        </div>
+                         <div>
+                            <label class="block text-sm font-medium text-gray-700">Area</label>
+                            <select id="co-pathao-area" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" disabled></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Delivery Charge (BDT)</label>
+                             <div id="delivery-charge-options" class="flex flex-col sm:flex-row sm:space-x-4 mt-1 text-sm">
+                                <label class="flex items-center"><input type="radio" name="delivery_option" value="dhaka" class="mr-1"> Inside Dhaka</label>
+                                <label class="flex items-center"><input type="radio" name="delivery_option" value="sub_dhaka" class="mr-1"> Sub Dhaka</label>
+                                <label class="flex items-center"><input type="radio" name="delivery_option" value="outside" class="mr-1"> Outside Dhaka</label>
+                            </div>
+                            <input type="number" id="co-delivery-charge" class="hidden mt-2 w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                    </div>
+                    <!-- Right: Items & Money -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                         <h3 class="text-xl font-semibold border-b pb-2 mb-4">Order Items</h3>
+                         <div class="relative mb-4">
+                             <input type="text" id="co-item-search" placeholder="Search product by ID or name..." class="w-full pl-10 pr-4 py-2 border rounded-md">
+                             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+                             <div id="co-item-search-results" class="absolute z-10 w-full bg-white border rounded-md mt-1 shadow-lg hidden"></div>
+                         </div>
+                         <div id="co-items-list" class="space-y-3 mb-4">
+                            <!-- JS will render items here -->
+                         </div>
+                         <div class="border-t pt-4 space-y-2">
+                             <div class="flex justify-between text-lg">
+                                 <span>Subtotal</span>
+                                 <span id="co-subtotal">৳0</span>
+                             </div>
+                             <div class="flex justify-between text-lg">
+                                 <span>Delivery</span>
+                                 <span id="co-delivery-summary">৳0</span>
+                             </div>
+                             <div class="flex justify-between items-center text-lg">
+                                 <span>Advance (BDT)</span>
+                                 <input type="number" id="co-advance-bdt" value="0" class="w-32 text-right p-1 border rounded-md">
+                             </div>
+                             <div class="flex justify-between text-2xl font-bold text-blue-600 border-t pt-2 mt-2">
+                                 <span>DUE</span>
+                                 <span id="co-due-total">৳0</span>
+                             </div>
+                         </div>
+                         <div class="mt-6 border-t pt-4">
+                            <h4 class="text-lg font-semibold">Estimated Delivery Date</h4>
+                            <div class="mt-2">
+                                <input type="date" id="co-eta" class="p-1 border rounded-md w-full md:w-1/2">
+                            </div>
+                         </div>
+                         <div class="mt-8 flex justify-end">
+                            <button id="save-order-btn" class="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 text-lg font-semibold">Save Order</button>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        orders: `
+             <div class="animate-enter">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Orders</h2>
+                <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <input type="text" id="order-search" placeholder="Search OrderID, phone, name..." class="w-full px-3 py-2 border rounded-md">
+                        <select id="order-status-filter" class="w-full px-3 py-2 border rounded-md">
+                            <option value="">All Statuses</option>
+                            <option>Pending</option><option>Processing</option><option>Packing</option><option>Ready</option><option>InTransit</option><option>Delivered</option><option>Cancelled</option><option>Returned</option>
+                        </select>
+                        <input type="date" id="order-date-from" class="w-full px-3 py-2 border rounded-md">
+                        <input type="date" id="order-date-to" class="w-full px-3 py-2 border rounded-md">
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                     <div id="bulk-actions-bar" class="hidden mb-4 p-2 bg-blue-50 border border-blue-200 rounded-md flex items-center gap-4">
+                        <span id="bulk-selection-count" class="font-semibold"></span>
+                        <select id="bulk-action-select" class="border-gray-300 rounded-md shadow-sm">
+                            <option>Bulk Actions</option>
+                            <option value="status">Update Status</option>
+                            <option value="pathao_send">Send to Pathao</option>
+                            <option value="pathao_sync">Sync Pathao</option>
+                            <option value="batch">Add to Batch</option>
+                            <option value="export">Export CSV</option>
+                        </select>
+                        <select id="bulk-status-select" class="hidden border-gray-300 rounded-md shadow-sm">
+                            <option>Pending</option><option>Processing</option><option>Packing</option><option>Ready</option><option>InTransit</option><option>Delivered</option><option>Cancelled</option><option>Returned</option>
+                        </select>
+                        <button id="bulk-action-apply" class="bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700">Apply</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left"><input type="checkbox" id="select-all-orders"></th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pathao</th>
+                                    <th class="px-6 py-3 text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="order-list-body" class="bg-white divide-y divide-gray-200">
+                                <!-- JS will render rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `,
+        batches: `
+            <div class="animate-enter">
+                 <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800">Batches</h2>
+                    <button id="create-batch-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
+                        <i data-lucide="plus" class="w-5 h-5"></i> Create Batch
+                    </button>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Analytics (BDT)</th>
+                                    <th class="px-6 py-3 text-right"></th>
+                                </tr>
+                            </thead>
+                             <tbody id="batch-list-body" class="bg-white divide-y divide-gray-200">
+                                <!-- JS will render rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `,
+        batchDetails: `
+            <div class="animate-enter">
+                <div class="flex items-center mb-6">
+                    <a href="#batches" class="text-blue-600 hover:underline flex items-center">
+                        <i data-lucide="arrow-left" class="w-5 h-5 mr-2"></i>
+                        Back to Batches
+                    </a>
+                </div>
+                <div id="batch-details-header">
+                    <h2 class="text-3xl font-bold text-gray-800">Batch #<span id="batch-id-details"></span></h2>
+                    <p class="text-gray-500">Created on <span id="batch-created-date"></span></p>
+                    <p class="mt-2 text-gray-700 bg-gray-100 p-2 rounded-md">Note: <span id="batch-note-details"></span></p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                    <!-- Analytics -->
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold border-b pb-2 mb-4">Analytics (BDT)</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total Buying Price</span>
+                                <span id="batch-buying-price" class="font-semibold text-lg text-red-600"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">Total Selling Price</span>
+                                <span id="batch-selling-price" class="font-semibold text-lg text-blue-600"></span>
+                            </div>
+                            <div class="flex justify-between items-center border-t pt-3 mt-3">
+                                <span class="font-bold text-gray-800">Gross Profit</span>
+                                <span id="batch-profit" class="font-bold text-2xl text-green-600"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Export -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold border-b pb-2 mb-4">Export</h3>
+                        <p class="text-sm text-gray-500 mb-4">Download a multi-sheet XLSX file for your agent with a product summary, variant details, and instructions.</p>
+                        <div class="flex">
+                            <button id="export-agent-file" class="w-full bg-green-600 text-white px-4 py-3 rounded-md hover:bg-green-700 flex items-center justify-center gap-2">
+                                <i data-lucide="file-spreadsheet" class="w-5 h-5"></i> Export Batch for Agent (XLSX)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orders in Batch -->
+                <div class="bg-white p-6 rounded-lg shadow-md mt-6">
+                     <h3 class="text-xl font-semibold mb-4">Orders in this Batch (<span id="batch-order-count"></span>)</h3>
+                     <div class="overflow-x-auto">
+                         <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Amount</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batch-orders-list-body" class="bg-white divide-y divide-gray-200">
+                                <!-- JS will render orders here -->
+                            </tbody>
+                         </table>
+                     </div>
+                </div>
+            </div>
+        `,
+        customers: `
+            <div class="animate-enter">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Customers</h2>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <input type="text" id="customer-search" placeholder="Search by name or phone..." class="w-full mb-4 px-3 py-2 border rounded-md">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customer-list-body" class="bg-white divide-y divide-gray-200">
+                                <!-- JS will render rows here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `,
+        settings: `
+            <div class="animate-enter">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Settings</h2>
+                <div class="max-w-4xl mx-auto">
+                    <!-- General Settings -->
+                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                        <h3 class="text-xl font-semibold border-b pb-2 mb-4">General</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">App Name</label>
+                                <input type="text" id="setting-app-name" class="mt-1 block w-full md:w-1/2 rounded-md border-gray-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Default Delivery Charges</label>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-gray-500">Inside Dhaka</label>
+                                        <input type="number" id="setting-charge-dhaka" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500">Sub-Dhaka</label>
+                                        <input type="number" id="setting-charge-sub-dhaka" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-500">Outside Dhaka</label>
+                                        <input type="number" id="setting-charge-outside" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Packing Completion Status</label>
+                                <select id="setting-packing-status" class="mt-1 block w-full md:w-1/2 rounded-md border-gray-300 shadow-sm">
+                                    <option value="Ready">Ready</option>
+                                    <option value="Packing">Packing</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                     <!-- Pathao Settings -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="text-xl font-semibold border-b pb-2 mb-4">Pathao</h3>
+                        <div class="space-y-4">
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">Client ID</label>
+                                <input type="text" id="setting-pathao-client-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">Client Secret</label>
+                                <input type="password" id="setting-pathao-client-secret" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">Webhook URL</label>
+                                <input type="text" id="setting-pathao-webhook-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                            </div>
+                             <div class="flex items-center">
+                                 <input type="checkbox" id="setting-pathao-sandbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                 <label for="setting-pathao-sandbox" class="ml-2 block text-sm text-gray-900">Enable Sandbox Mode</label>
+                            </div>
+                            <div class="p-3 bg-gray-100 rounded-md">
+                                <p class="text-sm font-medium text-gray-800">Your webhook endpoint:</p>
+                                <code class="text-xs text-red-600 break-all">https://your-backend-url.com/api/pathao/webhook</code>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="mt-6 flex justify-end gap-3">
+                        <button id="test-pathao-connection" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-200">Test Connection</button>
+                        <button id="save-settings" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        `,
+        track: `
+            <div class="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+                <div class="w-full max-w-2xl bg-white rounded-lg shadow-lg p-8">
+                    <div id="tracking-content">
+                        <!-- Content will be injected by JS -->
+                    </div>
+                </div>
+                <p class="mt-6 text-sm text-gray-500">Powered by <span id="track-app-name" class="font-semibold"></span></p>
+            </div>
+        `,
+    };
+
+    // --- RENDER FUNCTIONS ---
+    
+    function renderProductList() {
+        const productListBody = document.getElementById('product-list-body');
+        if (!productListBody) return;
+        const searchTerm = document.getElementById('product-search').value.toLowerCase();
+        productListBody.innerHTML = '';
+        state.products
+            .filter(p => p.name.toLowerCase().includes(searchTerm) || p.code?.toLowerCase().includes(searchTerm))
+            .forEach(product => {
+                const row = `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10">
+                                    <img class="h-10 w-10 rounded-md object-cover" src="${product.main_image_url}" alt="">
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">${product.name}</div>
+                                    <div class="text-sm text-gray-500">${product.code || 'N/A'}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${product.variants.length}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>${formatBDT(product.base_price_bdt)} / ${formatBDT(product.sell_price_bdt)}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${product.active ? 'Active' : 'Inactive'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="text-indigo-600 hover:text-indigo-900 edit-product-btn" data-id="${product.id}">Edit</button>
+                        </td>
+                    </tr>
+                `;
+                productListBody.insertAdjacentHTML('beforeend', row);
+            });
+    }
+    
+    function renderOrderList() {
+        const orderListBody = document.getElementById('order-list-body');
+        if (!orderListBody) return;
+        
+        // Add filtering logic here later
+        orderListBody.innerHTML = '';
+        
+        state.orders.forEach(order => {
+            const customer = state.customers.find(c => c.id === order.customer_id);
+            const total = order.items.reduce((sum, item) => sum + (item.sell_price_bdt_snapshot * item.qty), 0) + order.delivery_charge_bdt;
+            
+            const itemImages = order.items.map(item => `
+                <div class="relative inline-block">
+                    <img class="h-8 w-8 rounded-md object-cover border-2 border-white ring-1 ring-gray-300" src="${item.image_url_snapshot}" title="${item.product_name_snapshot} (${item.color_snapshot}/${item.size_snapshot})">
+                    <span class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">${item.qty}</span>
+                </div>
+            `).join('');
+
+            const row = `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4"><input type="checkbox" class="order-checkbox" data-id="${order.id}"></td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-semibold text-blue-600">#${order.id}</div>
+                        <div class="text-sm text-gray-500">${formatDate(order.created_at)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${customer.name}</div>
+                        <div class="text-sm text-gray-500">${customer.phone}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex -space-x-2">${itemImages}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${formatBDT(total)}</div>
+                        <div class="text-sm font-semibold text-red-600">Due: ${formatBDT(order.due_bdt)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-chip status-${order.status}">${order.status}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${order.pathao_tracking_code ? `
+                            <div>${order.pathao_tracking_code}</div>
+                            ${order.pathao_status ? `<span class="pathao-status-chip pathao-${order.pathao_status.replace(/\s+/g, '-')}">${order.pathao_status}</span>` : ''}
+                        ` : '<span class="text-gray-400">Not Sent</span>'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                       <button class="text-indigo-600 hover:text-indigo-900 view-order-btn" data-id="${order.id}">View</button>
+                    </td>
+                </tr>
+            `;
+             orderListBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+
+    function renderBatchList() {
+        const batchListBody = document.getElementById('batch-list-body');
+        if (!batchListBody) return;
+        batchListBody.innerHTML = '';
+        state.batches.forEach(batch => {
+            const batchOrders = state.orders.filter(o => batch.order_ids.includes(o.id));
+            const allItems = batchOrders.flatMap(o => o.items);
+            const buying = allItems.reduce((sum, i) => sum + (i.base_price_bdt_snapshot * i.qty), 0);
+            const selling = allItems.reduce((sum, i) => sum + (i.sell_price_bdt_snapshot * i.qty), 0);
+            const profit = selling - buying;
+
+            const row = `
+                 <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">#${batch.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(batch.created_at)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${batch.note}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${batch.order_ids.length}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <div class="text-green-600 font-semibold">Profit: ${formatBDT(profit)}</div>
+                        <div class="text-xs text-gray-500">Sell: ${formatBDT(selling)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-indigo-600 hover:text-indigo-900 batch-details-btn" data-id="${batch.id}">Details</button>
+                    </td>
+                </tr>
+            `;
+            batchListBody.insertAdjacentHTML('beforeend', row);
+        });
+    }
+    
+    function renderCustomerList() {
+        const customerListBody = document.getElementById('customer-list-body');
+        if (!customerListBody) return;
+
+        const searchTerm = document.getElementById('customer-search').value.toLowerCase();
+        customerListBody.innerHTML = '';
+
+        state.customers
+            .filter(c => c.name.toLowerCase().includes(searchTerm) || c.phone.includes(searchTerm))
+            .forEach(customer => {
+                const customerOrders = state.orders.filter(o => o.customer_id === customer.id);
+                const totalOrders = customerOrders.length;
+                const totalSpend = customerOrders.reduce((sum, order) => {
+                    const itemsTotal = order.items.reduce((itemSum, item) => itemSum + (item.sell_price_bdt_snapshot * item.qty), 0);
+                    return sum + itemsTotal + order.delivery_charge_bdt;
+                }, 0);
+
+                const row = `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">${customer.name}</div>
+                            <div class="text-sm text-gray-500">${customer.address_default || 'No address on file'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.phone}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">${totalOrders} Orders</div>
+                            <div class="text-sm text-green-600 font-semibold">${formatBDT(totalSpend)} Total Spend</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button class="bg-blue-100 text-blue-700 px-3 py-1 rounded-md text-sm hover:bg-blue-200 new-order-for-customer-btn" data-id="${customer.id}">New Order</button>
+                        </td>
+                    </tr>
+                `;
+                customerListBody.insertAdjacentHTML('beforeend', row);
+            });
+    }
+
+    // --- PAGE INITIALIZATION & EVENT LISTENERS ---
+
+    function initCatalogPage() {
+        lucide.createIcons();
+        renderProductList();
+
+        document.getElementById('product-search').addEventListener('input', renderProductList);
+        
+        const addProductBtn = document.getElementById('add-product-btn');
+        const formContainer = document.getElementById('add-product-form-container');
+        const cancelBtn = document.getElementById('cancel-product-form');
+
+        const showForm = () => formContainer.classList.remove('hidden');
+        const hideForm = () => formContainer.classList.add('hidden');
+
+        addProductBtn.addEventListener('click', () => {
+             document.getElementById('product-form').reset();
+             document.getElementById('product-id-input').value = '';
+             document.querySelector('#product-form [name="code"]').value = '';
+             document.getElementById('variant-groups-container').innerHTML = '';
+             showForm();
+        });
+        cancelBtn.addEventListener('click', hideForm);
+
+        document.getElementById('generate-description-btn').addEventListener('click', async (e) => {
+            const nameInput = document.querySelector('#product-form [name="name"]');
+            const descTextarea = document.querySelector('#product-form [name="description"]');
+            if (!nameInput.value) {
+                showToast('Please enter a product name first.', 'error');
+                return;
+            }
+            const prompt = `Write a short, exciting e-commerce product description for a product named "${nameInput.value}". Focus on quality and style.`;
+            const generatedDesc = await callGeminiAPI(prompt, e.target);
+            descTextarea.value = generatedDesc;
+        });
+
+        document.getElementById('add-variant-group-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const container = document.getElementById('variant-groups-container');
+            const cardId = `group-${Date.now()}`;
+            const cardHTML = `
+                <div class="border p-4 rounded-md bg-gray-50 variant-group-card relative" id="${cardId}">
+                    <button class="absolute top-2 right-2 text-red-500 hover:text-red-700 remove-group-btn">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Color</label>
+                            <input type="text" placeholder="e.g., Black" class="variant-color mt-1 w-full rounded-md border-gray-300 shadow-sm text-sm p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Image for this Color</label>
+                            <input type="file" accept="image/*" class="variant-image mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Sizes (comma-separated)</label>
+                            <input type="text" placeholder="e.g., M, L, XL" class="variant-sizes mt-1 w-full rounded-md border-gray-300 shadow-sm text-sm p-2">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700">Sell Price Override (for this group)</label>
+                            <input type="number" placeholder="Optional: Overrides main sell price" class="variant-price-override mt-1 w-full rounded-md border-gray-300 shadow-sm text-sm p-2">
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', cardHTML);
+            lucide.createIcons();
+            document.querySelector(`#${cardId} .remove-group-btn`).addEventListener('click', (e) => {
+                e.preventDefault();
+                document.getElementById(cardId).remove();
+            });
+        });
+        
+        document.getElementById('product-list-body').addEventListener('click', e => {
+            if (e.target.classList.contains('edit-product-btn')) {
+                const productId = parseInt(e.target.dataset.id);
+                const product = state.products.find(p => p.id === productId);
+                if (product) {
+                    // Populate and show the form for editing
+                    document.getElementById('product-id-input').value = product.id;
+                    document.querySelector('#product-form [name="name"]').value = product.name;
+                    document.querySelector('#product-form [name="description"]').value = product.description || '';
+                    // ... populate other fields ...
+                    showForm();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }
+        });
+
+        document.getElementById('product-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const form = document.getElementById('product-form');
+            const productId = parseInt(document.getElementById('product-id-input').value);
+            
+            const mainImageInput = form.elements['main_image_url'];
+            const mainImageUrl = mainImageInput.files.length > 0 ? URL.createObjectURL(mainImageInput.files[0]) : 'https://placehold.co/400x400?text=No+Image';
+            
+            const variants = [];
+            const groupCards = document.querySelectorAll('#variant-groups-container .variant-group-card');
+            
+            groupCards.forEach(card => {
+                const color = card.querySelector('.variant-color').value;
+                const imageInput = card.querySelector('.variant-image');
+                const sizesStr = card.querySelector('.variant-sizes').value;
+                const priceOverride = card.querySelector('.variant-price-override').value;
+
+                if (!color || !sizesStr) return; // Skip incomplete groups
+
+                const imageUrl = imageInput.files.length > 0 ? URL.createObjectURL(imageInput.files[0]) : null;
+                const sizes = sizesStr.split(',').map(s => s.trim()).filter(s => s); // Split, trim, and remove empty entries
+
+                sizes.forEach(size => {
+                    variants.push({
+                        id: Date.now() + Math.random(),
+                        color: color,
+                        size: size,
+                        variant_image_url: imageUrl,
+                        sell_price_bdt: priceOverride ? parseFloat(priceOverride) : null,
+                    });
+                });
+            });
+
+            const productName = form.elements['name'].value;
+            const firstLetter = productName ? productName.charAt(0).toUpperCase() : 'P';
+            const randomDigits = String(Math.floor(Math.random() * 90000) + 10000);
+            const generatedCode = `${firstLetter}-${randomDigits}`;
+
+            const newProductData = {
+                name: productName,
+                code: generatedCode,
+                source_link: form.elements['source_link'].value,
+                base_price_bdt: parseFloat(form.elements['base_price_bdt'].value),
+                sell_price_bdt: parseFloat(form.elements['sell_price_bdt'].value),
+                main_image_url: mainImageUrl,
+                description: form.elements['description'].value,
+                active: form.elements['active'].checked,
+                variants: variants
+            };
+
+            if (productId) {
+                // Update existing product
+                const index = state.products.findIndex(p => p.id === productId);
+                if (index !== -1) {
+                    // Preserve original code on update
+                    newProductData.code = state.products[index].code;
+                    state.products[index] = { ...state.products[index], ...newProductData };
+                    showToast('Product updated successfully!', 'success');
+                }
+            } else {
+                // Create new product
+                newProductData.id = Date.now();
+                state.products.push(newProductData);
+                showToast('Product created successfully!', 'success');
+            }
+            
+            formContainer.classList.add('hidden');
+            renderProductList();
+        });
+    }
+    
+    // --- CREATE ORDER PAGE LOGIC ---
+    let createOrderItems = [];
+
+    // Self-contained, global function to update the order summary
+    function updateCreateOrderSummary() {
+        const deliveryChargeRadio = document.querySelector('#create-order-page input[name="delivery_option"]:checked');
+        const deliveryCharge = deliveryChargeRadio ? state.settings.delivery_charge_map[deliveryChargeRadio.value] : 0;
+        
+        const advanceInput = document.getElementById('co-advance-bdt');
+        const advance = advanceInput ? parseFloat(advanceInput.value) || 0 : 0;
+
+        const subtotal = createOrderItems.reduce((sum, item) => sum + (item.unit_sell_price_bdt * item.qty), 0);
+        const due = subtotal + deliveryCharge - advance;
+        
+        const subtotalEl = document.getElementById('co-subtotal');
+        if (subtotalEl) subtotalEl.textContent = formatBDT(subtotal);
+
+        const deliveryEl = document.getElementById('co-delivery-summary');
+        if (deliveryEl) deliveryEl.textContent = formatBDT(deliveryCharge);
+        
+        const dueEl = document.getElementById('co-due-total');
+        if (dueEl) dueEl.textContent = formatBDT(due);
+    }
+
+    function initCreateOrderPage() {
+        lucide.createIcons();
+        const orderIdToEdit = state.editingOrderId;
+        const prefilledCustomer = state.prefilledCustomer;
+        state.editingOrderId = null; // Clear it immediately after use
+        state.prefilledCustomer = null; // Clear it immediately
+
+        const pageTitle = document.querySelector('#create-order-page h2');
+        const saveBtn = document.getElementById('save-order-btn');
+
+        if (orderIdToEdit) {
+            pageTitle.textContent = `Edit Order #${orderIdToEdit}`;
+            saveBtn.textContent = 'Update Order';
+            
+            const order = state.orders.find(o => o.id === orderIdToEdit);
+            const customer = state.customers.find(c => c.id === order.customer_id);
+            
+            document.getElementById('co-customer-name').value = customer.name;
+            document.getElementById('co-customer-phone').value = customer.phone;
+            document.getElementById('co-customer-address').value = order.address;
+            
+            createOrderItems = order.items.map(item => {
+                const product = state.products.find(p => p.id === item.product_id);
+                return {
+                    uniqueId: Date.now() + Math.random(),
+                    product_id: item.product_id,
+                    product: product,
+                    variant_id: item.variant_id,
+                    qty: item.qty,
+                    unit_sell_price_bdt: item.sell_price_bdt_snapshot
+                };
+            });
+            
+            document.getElementById('co-advance-bdt').value = order.advance_bdt;
+            document.getElementById('co-eta').value = order.eta_start;
+
+            let chargeKey = 'outside';
+            if (order.delivery_charge_bdt === state.settings.delivery_charge_map.dhaka) chargeKey = 'dhaka';
+            if (order.delivery_charge_bdt === state.settings.delivery_charge_map.sub_dhaka) chargeKey = 'sub_dhaka';
+            const radioToCheck = document.querySelector(`input[name="delivery_option"][value="${chargeKey}"]`);
+            if(radioToCheck) radioToCheck.checked = true;
+
+        } else if (prefilledCustomer) {
+            pageTitle.textContent = 'Create New Order';
+            saveBtn.textContent = 'Save Order';
+            document.getElementById('co-customer-name').value = prefilledCustomer.name;
+            document.getElementById('co-customer-phone').value = prefilledCustomer.phone;
+            document.getElementById('co-customer-address').value = prefilledCustomer.address_default || '';
+            createOrderItems = [];
+        }
+        else {
+            pageTitle.textContent = 'Create New Order';
+            saveBtn.textContent = 'Save Order';
+            createOrderItems = []; // Reset for new order
+        }
+        
+        renderCreateOrderItems();
+        updateCreateOrderSummary();
+        
+        // Populate Pathao dropdowns
+        const citySelect = document.getElementById('co-pathao-city');
+        const zoneSelect = document.getElementById('co-pathao-zone');
+        const areaSelect = document.getElementById('co-pathao-area');
+        
+        citySelect.innerHTML = '<option>Select District</option>' + state.pathaoCache.cities.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+        citySelect.addEventListener('change', () => {
+            const cityId = citySelect.value;
+            zoneSelect.disabled = !cityId;
+            zoneSelect.innerHTML = '<option>Select Zone</option>';
+            areaSelect.innerHTML = '<option>Select Area</option>';
+            areaSelect.disabled = true;
+            if (cityId && state.pathaoCache.zones[cityId]) {
+                 zoneSelect.innerHTML += state.pathaoCache.zones[cityId].map(z => `<option value="${z.id}">${z.name}</option>`).join('');
+            }
+            const selectedCityName = citySelect.options[citySelect.selectedIndex].text;
+            const deliveryOptionToSelect = (selectedCityName === 'Dhaka') ? 'dhaka' : 'outside';
+            const radioToSelect = document.querySelector(`input[name="delivery_option"][value="${deliveryOptionToSelect}"]`);
+            if (radioToSelect) {
+                radioToSelect.checked = true;
+                updateCreateOrderSummary();
+            }
+        });
+
+        zoneSelect.addEventListener('change', () => {
+             const zoneId = zoneSelect.value;
+            areaSelect.disabled = !zoneId;
+            areaSelect.innerHTML = '<option>Select Area</option>';
+            if (zoneId && state.pathaoCache.areas[zoneId]) {
+                 areaSelect.innerHTML += state.pathaoCache.areas[zoneId].map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+            }
+        });
+
+        const itemSearchInput = document.getElementById('co-item-search');
+        const searchResults = document.getElementById('co-item-search-results');
+
+        searchResults.addEventListener('click', (e) => {
+            if (e.target.classList.contains('search-result-item')) {
+                const productId = parseInt(e.target.dataset.id);
+                addOrderItem(productId);
+                itemSearchInput.value = '';
+                searchResults.classList.add('hidden');
+            }
+        });
+
+        itemSearchInput.addEventListener('input', () => {
+            const query = itemSearchInput.value.toLowerCase();
+            if (query.length < 2) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+            const results = state.products.filter(p => p.active && (p.name.toLowerCase().includes(query) || p.id.toString().includes(query)));
+            searchResults.innerHTML = results.map(p => `<div class="p-2 hover:bg-gray-100 cursor-pointer search-result-item" data-id="${p.id}">${p.name}</div>`).join('');
+            searchResults.classList.remove('hidden');
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (!itemSearchInput.contains(e.target)) {
+                 searchResults.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('delivery-charge-options').addEventListener('change', updateCreateOrderSummary);
+        document.getElementById('co-advance-bdt').addEventListener('input', updateCreateOrderSummary);
+
+        document.getElementById('co-items-list').addEventListener('input', (e) => {
+             if(e.target.classList.contains('co-item-qty') || e.target.classList.contains('co-item-price')) {
+                const itemDiv = e.target.closest('.co-order-item');
+                const uniqueId = itemDiv.dataset.uniqueId;
+                const item = createOrderItems.find(i => i.uniqueId == uniqueId);
+                if (item) {
+                    item.qty = parseInt(itemDiv.querySelector('.co-item-qty').value);
+                    item.unit_sell_price_bdt = parseFloat(itemDiv.querySelector('.co-item-price').value);
+                    updateCreateOrderSummary();
+                }
+            }
+        });
+         document.getElementById('co-items-list').addEventListener('change', (e) => {
+             if(e.target.classList.contains('co-variant-select')) {
+                const itemDiv = e.target.closest('.co-order-item');
+                const uniqueId = itemDiv.dataset.uniqueId;
+                const item = createOrderItems.find(i => i.uniqueId == uniqueId);
+                if (item) {
+                    const variantId = parseInt(e.target.value);
+                    item.variant_id = variantId;
+                    const variant = state.products.find(p => p.id === item.product_id).variants.find(v => v.id === variantId);
+                    if (variant) {
+                        item.unit_sell_price_bdt = variant.sell_price_bdt || item.product.sell_price_bdt;
+                        itemDiv.querySelector('.co-item-price').value = item.unit_sell_price_bdt;
+                        itemDiv.querySelector('img').src = variant.variant_image_url || item.product.main_image_url;
+                        updateCreateOrderSummary();
+                    }
+                }
+            }
+        });
+
+        document.getElementById('co-items-list').addEventListener('click', e => {
+            const removeButton = e.target.closest('.remove-co-item');
+            if (removeButton) {
+                const uniqueId = removeButton.dataset.uniqueId;
+                createOrderItems = createOrderItems.filter(i => i.uniqueId != uniqueId);
+                renderCreateOrderItems();
+                updateCreateOrderSummary();
+            }
+        });
+
+        document.getElementById('save-order-btn').addEventListener('click', () => {
+            if (createOrderItems.length === 0) {
+                showToast('Please add at least one item to the order.', 'error');
+                return;
+            }
+            
+            const deliveryChargeRadio = document.querySelector('#create-order-page input[name="delivery_option"]:checked');
+            const deliveryCharge = deliveryChargeRadio ? state.settings.delivery_charge_map[deliveryChargeRadio.value] : 0;
+            
+            const orderData = {
+                address: document.getElementById('co-customer-address').value,
+                delivery_charge_bdt: deliveryCharge,
+                advance_bdt: parseFloat(document.getElementById('co-advance-bdt').value) || 0,
+                pathao_city_name: document.getElementById('co-pathao-city').options[document.getElementById('co-pathao-city').selectedIndex].text,
+                pathao_zone_name: document.getElementById('co-pathao-zone').options[document.getElementById('co-pathao-zone').selectedIndex].text,
+                pathao_area_name: document.getElementById('co-pathao-area').options[document.getElementById('co-pathao-area').selectedIndex].text,
+                eta_start: document.getElementById('co-eta').value,
+                eta_end: document.getElementById('co-eta').value,
+                items: createOrderItems.map((item, index) => {
+                    const product = item.product;
+                    let snapshotData = {};
+
+                    if (item.variant_id) {
+                        const variant = product.variants.find(v => v.id === item.variant_id);
+                        snapshotData = {
+                            variant_id: item.variant_id,
+                            color_snapshot: variant.color,
+                            size_snapshot: variant.size,
+                            image_url_snapshot: variant.variant_image_url || product.main_image_url,
+                        };
+                    } else {
+                        snapshotData = {
+                            variant_id: null,
+                            color_snapshot: 'N/A',
+                            size_snapshot: 'N/A',
+                            image_url_snapshot: product.main_image_url,
+                        };
+                    }
+                    
+                    return {
+                        id: 400 + state.orders.flatMap(o => o.items).length + index + 1,
+                        product_id: item.product_id,
+                        qty: item.qty,
+                        product_name_snapshot: product.name,
+                        product_link_snapshot: product.source_link,
+                        sell_price_bdt_snapshot: item.unit_sell_price_bdt,
+                        base_price_bdt_snapshot: product.base_price_bdt,
+                        ...snapshotData
+                    };
+                }),
+            };
+            const subtotal = orderData.items.reduce((sum, i) => sum + (i.sell_price_bdt_snapshot * i.qty), 0);
+            orderData.due_bdt = subtotal + orderData.delivery_charge_bdt - orderData.advance_bdt;
+
+             // Handle customer creation/lookup
+            const customerName = document.getElementById('co-customer-name').value;
+            const customerPhone = document.getElementById('co-customer-phone').value;
+            let customer = state.customers.find(c => c.phone === customerPhone);
+            if (!customer) {
+                customer = { id: 300 + state.customers.length + 1, name: customerName, phone: customerPhone, address_default: orderData.address };
+                state.customers.push(customer);
+            }
+            orderData.customer_id = customer.id;
+
+            if (orderIdToEdit) {
+                // UPDATE LOGIC
+                const orderIndex = state.orders.findIndex(o => o.id === orderIdToEdit);
+                if(orderIndex !== -1) {
+                    const originalOrder = state.orders[orderIndex];
+                    state.orders[orderIndex] = { ...originalOrder, ...orderData, order_id: orderIdToEdit };
+                     showToast(`Order #${orderIdToEdit} updated successfully!`, 'success');
+                     window.location.hash = '#orders';
+                }
+            } else {
+                // CREATE LOGIC
+                const newOrderId = 2024000 + state.orders.length + 1;
+                const newOrder = {
+                    ...orderData,
+                    id: newOrderId,
+                    created_at: new Date().toISOString(),
+                    status: 'Pending',
+                    pathao_tracking_code: null, pathao_order_id: null, pathao_status: null, last_synced_at: null,
+                };
+                newOrder.items.forEach(item => item.order_id = newOrderId);
+                state.orders.unshift(newOrder);
+                showCreateOrderSuccessModal(newOrderId);
+            }
+
+            createOrderItems = [];
+        });
+    }
+
+    function addOrderItem(productId) {
+        const product = state.products.find(p => p.id === productId);
+        if (!product) return;
+
+        let newItem;
+
+        if (product.variants && product.variants.length > 0) {
+            // Product HAS variants, use the first one as default
+            const firstVariant = product.variants[0];
+            newItem = {
+                uniqueId: Date.now(),
+                product_id: product.id,
+                product: product,
+                variant_id: firstVariant.id,
+                qty: 1,
+                unit_sell_price_bdt: firstVariant.sell_price_bdt || product.sell_price_bdt
+            };
+        } else {
+            // Product has NO variants
+            newItem = {
+                uniqueId: Date.now(),
+                product_id: product.id,
+                product: product,
+                variant_id: null, // IMPORTANT
+                qty: 1,
+                unit_sell_price_bdt: product.sell_price_bdt
+            };
+        }
+        
+        createOrderItems.push(newItem);
+        renderCreateOrderItems();
+        updateCreateOrderSummary();
+    }
+
+    function renderCreateOrderItems() {
+        const itemsList = document.getElementById('co-items-list');
+        if (!itemsList) return;
+        itemsList.innerHTML = '';
+        createOrderItems.forEach(item => {
+             const product = item.product;
+             let itemHTML = '';
+
+             if (item.variant_id) {
+                // Product has variants
+                const selectedVariant = product.variants.find(v => v.id === item.variant_id);
+                if (!selectedVariant) {
+                    console.error("Could not find variant for item:", item);
+                    return;
+                }
+                const variantOptions = product.variants.map(v => `<option value="${v.id}" ${v.id === item.variant_id ? 'selected' : ''}>${v.color} - ${v.size}</option>`).join('');
+
+                itemHTML = `
+                    <div class="flex items-center gap-4 border p-2 rounded-md co-order-item" data-unique-id="${item.uniqueId}">
+                        <img src="${selectedVariant.variant_image_url || product.main_image_url}" class="w-16 h-16 object-cover rounded-md">
+                        <div class="flex-grow">
+                            <p class="font-semibold">${product.name}</p>
+                            <select class="co-variant-select mt-1 text-sm border-gray-300 rounded-md shadow-sm">${variantOptions}</select>
+                        </div>
+                        <div class="w-24">
+                            <label class="text-xs">Price</label>
+                            <input type="number" value="${item.unit_sell_price_bdt}" class="co-item-price w-full p-1 border rounded-md">
+                        </div>
+                        <div class="w-16">
+                            <label class="text-xs">Qty</label>
+                            <input type="number" value="${item.qty}" min="1" class="co-item-qty w-full p-1 border rounded-md">
+                        </div>
+                        <button class="remove-co-item text-red-500 hover:text-red-700 p-1" data-unique-id="${item.uniqueId}">
+                            <i data-lucide="x-circle" class="w-5 h-5 pointer-events-none"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Product has NO variants
+                itemHTML = `
+                    <div class="flex items-center gap-4 border p-2 rounded-md co-order-item" data-unique-id="${item.uniqueId}">
+                        <img src="${product.main_image_url}" class="w-16 h-16 object-cover rounded-md">
+                        <div class="flex-grow">
+                            <p class="font-semibold">${product.name}</p>
+                            <p class="text-sm text-gray-500 mt-1">Standard Product</p>
+                        </div>
+                        <div class="w-24">
+                            <label class="text-xs">Price</label>
+                            <input type="number" value="${item.unit_sell_price_bdt}" class="co-item-price w-full p-1 border rounded-md">
+                        </div>
+                        <div class="w-16">
+                            <label class="text-xs">Qty</label>
+                            <input type="number" value="${item.qty}" min="1" class="co-item-qty w-full p-1 border rounded-md">
+                        </div>
+                        <button class="remove-co-item text-red-500 hover:text-red-700 p-1" data-unique-id="${item.uniqueId}">
+                            <i data-lucide="x-circle" class="w-5 h-5 pointer-events-none"></i>
+                        </button>
+                    </div>
+                `;
+            }
+            itemsList.insertAdjacentHTML('beforeend', itemHTML);
+        });
+        lucide.createIcons();
+    }
+    
+    function initOrdersPage() {
+        lucide.createIcons();
+        if (state.currentUser.role === 'moderator') {
+            const bulkActionSelect = document.getElementById('bulk-action-select');
+            if (bulkActionSelect) {
+                const batchOption = bulkActionSelect.querySelector('option[value="batch"]');
+                if (batchOption) batchOption.remove();
+            }
+        }
+        renderOrderList();
+        
+        document.getElementById('order-list-body').addEventListener('click', e => {
+            const viewButton = e.target.closest('.view-order-btn');
+            if (viewButton) {
+                const orderId = parseInt(viewButton.dataset.id);
+                showOrderDrawer(orderId);
+            }
+        });
+        
+        const selectAllCheckbox = document.getElementById('select-all-orders');
+        const bulkActionsBar = document.getElementById('bulk-actions-bar');
+        const bulkSelectionCount = document.getElementById('bulk-selection-count');
+        
+        const updateBulkActionsBar = () => {
+            const selectedCount = document.querySelectorAll('.order-checkbox:checked').length;
+            if (selectedCount > 0) {
+                bulkActionsBar.classList.remove('hidden');
+                bulkSelectionCount.textContent = `${selectedCount} selected`;
+            } else {
+                bulkActionsBar.classList.add('hidden');
+            }
+        };
+
+        selectAllCheckbox.addEventListener('change', (e) => {
+            document.querySelectorAll('.order-checkbox').forEach(checkbox => checkbox.checked = e.target.checked);
+            updateBulkActionsBar();
+        });
+
+        document.getElementById('order-list-body').addEventListener('change', e => {
+            if(e.target.classList.contains('order-checkbox')) {
+                 if (!e.target.checked) {
+                    selectAllCheckbox.checked = false;
+                }
+                updateBulkActionsBar();
+            }
+        });
+        
+        document.getElementById('bulk-action-select').addEventListener('change', e => {
+            document.getElementById('bulk-status-select').classList.toggle('hidden', e.target.value !== 'status');
+        });
+        
+        document.getElementById('bulk-action-apply').addEventListener('click', () => {
+            const selectedAction = document.getElementById('bulk-action-select').value;
+            const selectedOrderIds = Array.from(document.querySelectorAll('.order-checkbox:checked')).map(cb => parseInt(cb.dataset.id));
+            
+            if (selectedOrderIds.length === 0) {
+                showToast('No orders selected.', 'error');
+                return;
+            }
+
+            if (state.currentUser.role === 'moderator' && selectedAction === 'batch') {
+                showToast('Access Denied. Moderators cannot add orders to batches.', 'error');
+                return;
+            }
+
+            switch (selectedAction) {
+                case 'status':
+                    const newStatus = document.getElementById('bulk-status-select').value;
+                    state.orders.forEach(order => {
+                        if (selectedOrderIds.includes(order.id)) {
+                            order.status = newStatus;
+                        }
+                    });
+                    showToast(`${selectedOrderIds.length} orders updated to "${newStatus}".`, 'success');
+                    break;
+                case 'batch':
+                    showAssignToBatchModal(selectedOrderIds);
+                    break;
+                case 'pathao_send':
+                case 'pathao_sync':
+                case 'export':
+                    showToast(`Action "${selectedAction}" is not yet implemented.`, 'info');
+                    break;
+                default:
+                    showToast('Please select a valid bulk action.', 'error');
+                    return;
+            }
+            
+            renderOrderList();
+            document.getElementById('select-all-orders').checked = false;
+            updateBulkActionsBar();
+        });
+    }
+
+    function initBatchesPage() {
+        lucide.createIcons();
+        renderBatchList();
+
+        document.getElementById('create-batch-btn').addEventListener('click', () => showCreateEmptyBatchModal());
+        
+        document.getElementById('batch-list-body').addEventListener('click', (e) => {
+            const detailsButton = e.target.closest('.batch-details-btn');
+            if (detailsButton) {
+                const batchId = detailsButton.dataset.id;
+                window.location.hash = `#batches/${batchId}`;
+            }
+    });
+    }
+
+    function initBatchDetailsPage(batchId) {
+        lucide.createIcons();
+        const batch = state.batches.find(b => b.id == batchId);
+
+        if (!batch) {
+            document.getElementById('content-area').innerHTML = `<div class="text-center text-red-500">Batch not found. <a href="#batches" class="underline">Go back</a>.</div>`;
+            return;
+        }
+
+        const batchOrders = state.orders.filter(o => batch.order_ids.includes(o.id));
+        const allItems = batchOrders.flatMap(o => o.items);
+        
+        const buying = allItems.reduce((sum, i) => sum + (i.base_price_bdt_snapshot * i.qty), 0);
+        const selling = allItems.reduce((sum, i) => sum + (i.sell_price_bdt_snapshot * i.qty), 0);
+        const profit = selling - buying;
+
+        // Populate header and analytics
+        document.getElementById('batch-id-details').textContent = batch.id;
+        document.getElementById('batch-created-date').textContent = formatDate(batch.created_at);
+        document.getElementById('batch-note-details').textContent = batch.note;
+        document.getElementById('batch-buying-price').textContent = formatBDT(buying);
+        document.getElementById('batch-selling-price').textContent = formatBDT(selling);
+        document.getElementById('batch-profit').textContent = formatBDT(profit);
+        document.getElementById('batch-order-count').textContent = batchOrders.length;
+
+        // Populate orders list
+        const ordersListBody = document.getElementById('batch-orders-list-body');
+        ordersListBody.innerHTML = '';
+        batchOrders.forEach(order => {
+            const customer = state.customers.find(c => c.id === order.customer_id);
+            const itemSummary = order.items.map(i => `${i.qty}x ${i.product_name_snapshot.substring(0, 15)}...`).join(', ');
+            const row = `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">#${order.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.name}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${itemSummary}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">${formatBDT(order.due_bdt)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap"><span class="status-chip status-${order.status}">${order.status}</span></td>
+                </tr>
+            `;
+            ordersListBody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Add event listener for the main export button
+        document.getElementById('export-agent-file').addEventListener('click', () => {
+            showToast('Generating Agent XLSX file...', 'info');
+            
+            // --- 1. Prepare data for Agent_Order_Summary sheet ---
+            const productSummary = allItems.reduce((acc, item) => {
+                if (!acc[item.product_id]) {
+                    const product = state.products.find(p => p.id === item.product_id);
+                    acc[item.product_id] = {
+                        product: product,
+                        totalQty: 0,
+                        variants: {} // e.g., { "Red 41": 2, "Red 42": 1 }
+                    };
+                }
+                
+                acc[item.product_id].totalQty += item.qty;
+                const variantKey = `${item.color_snapshot} ${item.size_snapshot}`;
+                acc[item.product_id].variants[variantKey] = (acc[item.product_id].variants[variantKey] || 0) + item.qty;
+
+                return acc;
+            }, {});
+
+            const summarySheetData = Object.values(productSummary).map(summary => {
+                const variantsSummaryString = Object.entries(summary.variants)
+                    .map(([variant, qty]) => `${variant}×${qty}`)
+                    .join('; ');
+                
+                return {
+                    'BatchID': batch.id,
+                    'ProductID': summary.product.id,
+                    'ProductName': summary.product.name,
+                    'ProductLink': summary.product.source_link || '',
+                    'ImageURL': summary.product.main_image_url || '',
+                    'VariantsSummary': variantsSummaryString,
+                    'TotalQty': summary.totalQty,
+                    'PricePerUnit_CNY (Agent)': '',
+                    'Seller→Agent_Ship_CNY (Agent)': '',
+                    'Subtotal_CNY': '',
+                    'TotalCost_CNY': '',
+                    'TotalCost_BDT': '',
+                    'Notes': ''
+                };
+            });
+
+            // --- 2. Prepare data for Variant_Details sheet ---
+            const variantDetails = allItems.reduce((acc, item) => {
+                const key = `${item.product_id}-${item.color_snapshot}-${item.size_snapshot}`;
+                if (!acc[key]) {
+                    acc[key] = {
+                        'BatchID': batch.id,
+                        'ProductID': item.product_id,
+                        'ProductName': item.product_name_snapshot,
+                        'Color': item.color_snapshot,
+                        'Size': item.size_snapshot,
+                        'Qty': 0,
+                        'ImageURL': item.image_url_snapshot || ''
+                    };
+                }
+                acc[key].Qty += item.qty;
+                return acc;
+            }, {});
+
+            const variantSheetData = Object.values(variantDetails);
+
+            // --- 3. Prepare data for ReadMe sheet ---
+            const readMeSheetData = [
+                ['How to use:'],
+                ['1) Agent_Order_Summary = one row per product (all variants grouped).'],
+                ['   - Agent fills: PricePerUnit_CNY and Seller→Agent_Ship_CNY.'],
+                ['   - Subtotal/Total in CNY and BDT are auto-calculated (formulas need to be set up in Excel).'],
+                ['2) Variant_Details = per-variant breakdown used for packing/verification.'],
+                [],
+                ['CNY_to_BDT_Rate', 15.0] // Default Rate
+            ];
+
+            // --- 4. Use SheetJS to create and download the multi-sheet XLSX file ---
+            const wb = XLSX.utils.book_new();
+            const wsSummary = XLSX.utils.json_to_sheet(summarySheetData);
+            const wsVariants = XLSX.utils.json_to_sheet(variantSheetData);
+            const wsReadMe = XLSX.utils.aoa_to_sheet(readMeSheetData);
+            
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Agent_Order_Summary");
+            XLSX.utils.book_append_sheet(wb, wsVariants, "Variant_Details");
+            XLSX.utils.book_append_sheet(wb, wsReadMe, "ReadMe");
+            
+            XLSX.writeFile(wb, `Batch_${batch.id}_Agent_Order_List.xlsx`);
+        });
+    }
+
+    function initCustomersPage() {
+        lucide.createIcons();
+        renderCustomerList();
+
+        document.getElementById('customer-search').addEventListener('input', renderCustomerList);
+
+        document.getElementById('customer-list-body').addEventListener('click', e => {
+            const newOrderBtn = e.target.closest('.new-order-for-customer-btn');
+            if (newOrderBtn) {
+                const customerId = parseInt(newOrderBtn.dataset.id);
+                const customer = state.customers.find(c => c.id === customerId);
+                if (customer) {
+                    // Store customer data for pre-filling
+                    state.prefilledCustomer = customer;
+                    window.location.hash = '#create-order';
+                }
+            }
+        });
+    }
+    
+    function initSettingsPage() {
+        // Load settings into form
+        document.getElementById('setting-app-name').value = state.settings.appName;
+        document.getElementById('setting-charge-dhaka').value = state.settings.delivery_charge_map.dhaka;
+        document.getElementById('setting-charge-sub-dhaka').value = state.settings.delivery_charge_map.sub_dhaka;
+        document.getElementById('setting-charge-outside').value = state.settings.delivery_charge_map.outside;
+        document.getElementById('setting-packing-status').value = state.settings.packing_completion_status;
+        
+        document.getElementById('setting-pathao-client-id').value = state.settings.pathao.client_id;
+        document.getElementById('setting-pathao-client-secret').value = state.settings.pathao.client_secret;
+        document.getElementById('setting-pathao-webhook-url').value = state.settings.pathao.webhook_url;
+        document.getElementById('setting-pathao-sandbox').checked = state.settings.pathao.sandbox;
+
+        document.getElementById('save-settings').addEventListener('click', () => {
+            // Here you would save the settings to the backend
+            showToast('Settings saved successfully!', 'success');
+        });
+        document.getElementById('test-pathao-connection').addEventListener('click', () => {
+             showToast('Testing Pathao connection...', 'info');
+             setTimeout(() => showToast('Pathao connection successful!', 'success'), 1500);
+        });
+    }
+
+    function initTrackingPage(orderId) {
+        const order = state.orders.find(o => o.id == orderId);
+        const contentEl = document.getElementById('tracking-content');
+        document.getElementById('track-app-name').textContent = state.settings.appName;
+
+        if (!order) {
+            contentEl.innerHTML = `
+                <div class="text-center">
+                    <i data-lucide="search-x" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800">Order Not Found</h2>
+                    <p class="text-gray-500 mt-2">We couldn't find an order with the ID #${orderId}. Please check the link and try again.</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+
+        const statuses = ['Pending', 'Processing', 'Packing', 'InTransit', 'Delivered'];
+        const currentStatusIndex = statuses.indexOf(order.status);
+
+        const timelineHTML = statuses.map((status, index) => {
+            let statusClass = 'bg-gray-300';
+            let textClass = 'text-gray-500';
+            if (index < currentStatusIndex) {
+                statusClass = 'bg-green-500'; // Completed
+                textClass = 'text-gray-800 font-semibold';
+            } else if (index === currentStatusIndex) {
+                statusClass = 'bg-blue-500 ring-4 ring-blue-200'; // Current
+                textClass = 'text-blue-600 font-bold';
+            }
+            return `
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white ${statusClass}">
+                        <i data-lucide="check" class="w-5 h-5"></i>
+                    </div>
+                    <span class="ml-4 text-lg ${textClass}">${status}</span>
+                </div>
+                ${index < statuses.length - 1 ? '<div class="h-12 w-0.5 bg-gray-300 ml-4"></div>' : ''}
+            `;
+        }).join('');
+
+        contentEl.innerHTML = `
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">Tracking Order #${order.id}</h2>
+                <p class="text-lg text-gray-500 mt-2">Estimated Delivery: <span class="font-semibold text-gray-700">${formatDate(order.eta_start)}</span></p>
+            </div>
+
+            <div class="flex flex-col items-center">
+                ${timelineHTML}
+            </div>
+
+            <div class="mt-8 border-t pt-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Items in your order</h3>
+                <div class="space-y-4">
+                    ${order.items.map(item => `
+                        <div class="flex items-center gap-4">
+                            <img src="${item.image_url_snapshot}" class="w-16 h-16 rounded-lg object-cover">
+                            <div>
+                                <p class="font-semibold text-gray-800">${item.product_name_snapshot}</p>
+                                <p class="text-sm text-gray-500">${item.color_snapshot} / ${item.size_snapshot}</p>
+                                <p class="text-sm text-gray-500">Quantity: ${item.qty}</p>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+
+    // --- MODALS & DRAWERS ---
+
+    function showOrderDrawer(orderId) {
+        const order = state.orders.find(o => o.id === orderId);
+        if (!order) return;
+        
+        const customer = state.customers.find(c => c.id === order.customer_id);
+        const subtotal = order.items.reduce((sum, item) => sum + (item.sell_price_bdt_snapshot * item.qty), 0);
+        const trackingLink = `${window.location.origin}${window.location.pathname}#track/${order.id}`;
+
+        const modalHTML = `
+            <div id="order-drawer-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
+            <div id="order-drawer" class="fixed top-0 right-0 h-full w-full max-w-2xl bg-white shadow-xl z-50 transform translate-x-full transition-transform duration-300">
+                <div class="p-6 h-full flex flex-col">
+                    <!-- Header -->
+                    <div class="flex justify-between items-center border-b pb-4 mb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">Order #${order.id}</h2>
+                            <p class="text-sm text-gray-500">Created on ${formatDate(order.created_at)}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                             <span class="status-chip status-${order.status}">${order.status}</span>
+                            <button id="edit-order-btn" data-id="${order.id}" class="p-1 rounded-full hover:bg-gray-200">
+                                <i data-lucide="file-pen-line" class="w-5 h-5 text-gray-600"></i>
+                            </button>
+                            <button id="close-drawer-btn" class="p-1 rounded-full hover:bg-gray-200">
+                                <i data-lucide="x" class="w-6 h-6 text-gray-600"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Body -->
+                    <div class="flex-grow overflow-y-auto pr-2">
+                        <div class="grid grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <h3 class="font-semibold text-gray-700">Customer</h3>
+                                <p>${customer.name}</p>
+                                <p>${customer.phone}</p>
+                                <p>${order.address}</p>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-700">Delivery</h3>
+                                <p>${order.pathao_city_name}, ${order.pathao_zone_name}, ${order.pathao_area_name}</p>
+                                <p class="font-medium">Charge: ${formatBDT(order.delivery_charge_bdt)}</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-lg mb-6">
+                             <h3 class="font-semibold text-gray-800 mb-2">Customer Tracking Link</h3>
+                             <div class="flex items-center gap-2">
+                                <input type="text" readonly id="tracking-link-input" value="${trackingLink}" class="w-full text-sm bg-gray-200 p-2 rounded-md border-transparent focus:ring-0">
+                                <button id="copy-tracking-link-btn" class="bg-blue-100 text-blue-700 p-2 rounded-md hover:bg-blue-200"><i data-lucide="copy" class="w-5 h-5"></i></button>
+                             </div>
+                        </div>
+                        
+                        <h3 class="font-semibold text-gray-700 mb-2">Items</h3>
+                        <div class="space-y-2 border-t border-b py-2 mb-4">
+                            ${order.items.map(item => `
+                                <div class="flex items-center gap-4">
+                                    <img src="${item.image_url_snapshot}" class="w-12 h-12 rounded-md object-cover">
+                                    <div class="flex-grow">
+                                        <p class="font-medium">${item.product_name_snapshot}</p>
+                                        <p class="text-sm text-gray-500">${item.color_snapshot} / ${item.size_snapshot}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p>${formatBDT(item.sell_price_bdt_snapshot)} x ${item.qty}</p>
+                                        <p class="font-semibold">${formatBDT(item.sell_price_bdt_snapshot * item.qty)}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        
+                         <div class="space-y-1 text-right mb-6">
+                             <p>Subtotal: <span class="font-medium">${formatBDT(subtotal)}</span></p>
+                             <p>Delivery: <span class="font-medium">${formatBDT(order.delivery_charge_bdt)}</span></p>
+                             <p>Advance: <span class="font-medium text-green-600">-${formatBDT(order.advance_bdt)}</span></p>
+                             <p class="text-xl font-bold text-red-600">Due: <span class="font-bold">${formatBDT(order.due_bdt)}</span></p>
+                         </div>
+
+                         <!-- Pathao Panel -->
+                         <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                             <h3 class="font-semibold text-gray-800 mb-2">Pathao Details</h3>
+                             ${order.pathao_tracking_code ? `
+                                <p>Tracking: <span class="font-mono text-blue-600">${order.pathao_tracking_code}</span></p>
+                                <p>Status: <span class="pathao-status-chip pathao-${order.pathao_status.replace(/\s+/g, '-')}">${order.pathao_status}</span></p>
+                                <p class="text-xs text-gray-500 mt-1">Last synced: ${formatDate(order.last_synced_at)}</p>
+                                <div class="mt-3 flex gap-2">
+                                     <button class="bg-indigo-500 text-white px-3 py-1 rounded-md text-sm hover:bg-indigo-600">Sync Status</button>
+                                </div>
+                             ` : `
+                                <p class="text-gray-600">This order has not been sent to Pathao yet.</p>
+                                <div class="mt-3">
+                                     <button class="bg-green-600 text-white px-3 py-1 rounded-md text-sm hover:bg-green-700">Send to Pathao</button>
+                                </div>
+                             `}
+                         </div>
+                         
+                         <!-- Customer Communication Panel -->
+                          <div class="bg-blue-50 p-4 rounded-lg">
+                             <h3 class="font-semibold text-gray-800 mb-2">Customer Communication</h3>
+                             <textarea id="customer-comm-message" rows="4" class="w-full p-2 border rounded-md" placeholder="Draft a message for the customer..."></textarea>
+                             <div class="mt-2 flex justify-end">
+                                 <button id="suggest-followup-btn" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md text-sm hover:bg-indigo-200">✨ Suggest Follow-up Message</button>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('modal-container').innerHTML = modalHTML;
+        
+        const drawer = document.getElementById('order-drawer');
+        const backdrop = document.getElementById('order-drawer-backdrop');
+        const closeBtn = document.getElementById('close-drawer-btn');
+        const suggestBtn = document.getElementById('suggest-followup-btn');
+        const editBtn = document.getElementById('edit-order-btn');
+        const copyLinkBtn = document.getElementById('copy-tracking-link-btn');
+        
+        const closeDrawer = () => {
+            drawer.classList.add('translate-x-full');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => document.getElementById('modal-container').innerHTML = '', 300);
+        };
+
+        setTimeout(() => drawer.classList.remove('translate-x-full'), 10);
+        lucide.createIcons();
+        
+        backdrop.addEventListener('click', closeDrawer);
+        closeBtn.addEventListener('click', closeDrawer);
+
+        editBtn.addEventListener('click', () => {
+            closeDrawer();
+            state.editingOrderId = order.id; 
+            window.location.hash = '#create-order';
+        });
+
+        copyLinkBtn.addEventListener('click', (e) => {
+            copyToClipboard(trackingLink, () => {
+                showToast('Tracking link copied to clipboard!');
+                const icon = e.currentTarget.querySelector('i');
+                icon.setAttribute('data-lucide', 'check');
+                lucide.createIcons();
+                setTimeout(() => {
+                    icon.setAttribute('data-lucide', 'copy');
+                    lucide.createIcons();
+                }, 2000);
+            });
+        });
+
+        suggestBtn.addEventListener('click', async (e) => {
+            const prompt = `Generate a friendly customer follow-up message for an order with status "${order.status}". The customer is ${customer.name}. The order ID is ${order.id}. ${order.pathao_tracking_code ? `The Pathao tracking code is ${order.pathao_tracking_code}.` : ''}`;
+            const message = await callGeminiAPI(prompt, e.target);
+            const personalizedMessage = message
+                .replace('[Customer Name]', customer.name)
+                .replace('[Order ID]', order.id);
+            document.getElementById('customer-comm-message').value = personalizedMessage;
+        });
+    }
+
+    function showCreateEmptyBatchModal() {
+        const modalHTML = `
+            <div id="batch-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
+            <div id="batch-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-200">
+                    <div class="p-6">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h2 class="text-xl font-bold text-gray-800">Create New Batch</h2>
+                             <button id="close-batch-modal-btn" class="p-1 rounded-full hover:bg-gray-200">
+                                <i data-lucide="x" class="w-5 h-5 text-gray-600"></i>
+                            </button>
+                        </div>
+                        <div>
+                             <div class="flex justify-between items-center">
+                                <label class="block text-sm font-medium text-gray-700">Batch Name / Note</label>
+                                <button type="button" id="generate-batch-note-btn" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md hover:bg-indigo-200">✨ Suggest</button>
+                            </div>
+                            <textarea id="batch-note" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="e.g., October T-Shirt Run"></textarea>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button id="save-batch-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Create Batch</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('modal-container').innerHTML = modalHTML;
+        lucide.createIcons();
+
+        const modal = document.querySelector('#batch-modal > div');
+        const backdrop = document.getElementById('batch-modal-backdrop');
+        const closeModal = () => {
+            modal.classList.add('scale-95', 'opacity-0');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => document.getElementById('modal-container').innerHTML = '', 200);
+        };
+
+        setTimeout(() => modal.classList.remove('scale-95', 'opacity-0'), 10);
+        backdrop.addEventListener('click', closeModal);
+        document.getElementById('close-batch-modal-btn').addEventListener('click', closeModal);
+
+        document.getElementById('save-batch-btn').addEventListener('click', () => {
+            const note = document.getElementById('batch-note').value;
+             if (!note) {
+                showToast('Please enter a name or note for the batch.', 'error');
+                return;
+            }
+
+            const newBatch = {
+                id: 500 + state.batches.length + 1,
+                note: note,
+                created_at: new Date().toISOString(),
+                created_by: 'admin',
+                order_ids: []
+            };
+
+            state.batches.push(newBatch);
+            showToast(`Batch #${newBatch.id} created successfully.`, 'success');
+            closeModal();
+            renderBatchList();
+        });
+        
+        document.getElementById('generate-batch-note-btn').addEventListener('click', async e => {
+            const prompt = `Generate a short, practical batch name.`;
+            const note = await callGeminiAPI(prompt, e.target);
+            document.getElementById('batch-note').value = note;
+        });
+    }
+    
+    function showAssignToBatchModal(selectedOrderIds) {
+        const allBatchedOrderIds = state.batches.flatMap(b => b.order_ids);
+        const unbatchedSelectedIds = selectedOrderIds.filter(id => !allBatchedOrderIds.includes(id));
+
+        const modalHTML = `
+            <div id="assign-batch-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
+            <div id="assign-batch-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-200">
+                    <div class="p-6">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h2 class="text-xl font-bold text-gray-800">Assign to Batch</h2>
+                             <button id="close-assign-modal-btn" class="p-1 rounded-full hover:bg-gray-200">
+                                <i data-lucide="x" class="w-5 h-5 text-gray-600"></i>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">You have selected ${selectedOrderIds.length} orders. ${unbatchedSelectedIds.length} are unbatched and can be assigned.</p>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Select Batch</label>
+                            <select id="assign-batch-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                ${state.batches.map(b => `<option value="${b.id}">#${b.id} - ${b.note}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button id="assign-orders-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Assign ${unbatchedSelectedIds.length} Orders</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('modal-container').innerHTML = modalHTML;
+        lucide.createIcons();
+
+        const modal = document.querySelector('#assign-batch-modal > div');
+        const backdrop = document.getElementById('assign-batch-modal-backdrop');
+
+        const closeModal = () => {
+            modal.classList.add('scale-95', 'opacity-0');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => document.getElementById('modal-container').innerHTML = '', 200);
+        };
+
+        setTimeout(() => modal.classList.remove('scale-95', 'opacity-0'), 10);
+        backdrop.addEventListener('click', closeModal);
+        document.getElementById('close-assign-modal-btn').addEventListener('click', closeModal);
+
+        document.getElementById('assign-orders-btn').addEventListener('click', () => {
+            const targetBatchId = parseInt(document.getElementById('assign-batch-select').value);
+            const targetBatch = state.batches.find(b => b.id === targetBatchId);
+
+            if (!targetBatch) {
+                showToast('Selected batch not found.', 'error');
+                return;
+            }
+
+            if (unbatchedSelectedIds.length > 0) {
+                targetBatch.order_ids = [...new Set([...targetBatch.order_ids, ...unbatchedSelectedIds])];
+                showToast(`${unbatchedSelectedIds.length} orders assigned to Batch #${targetBatchId}.`, 'success');
+            } else {
+                showToast('No new orders to assign.', 'info');
+            }
+
+            const skippedCount = selectedOrderIds.length - unbatchedSelectedIds.length;
+            if (skippedCount > 0) {
+                showToast(`${skippedCount} selected orders were already in a batch and were skipped.`, 'info');
+            }
+            
+            closeModal();
+            document.querySelectorAll('.order-checkbox:checked').forEach(cb => cb.checked = false);
+            document.getElementById('select-all-orders').checked = false;
+            document.getElementById('bulk-actions-bar').classList.add('hidden');
+        });
+    }
+    
+    function showCreateOrderSuccessModal(orderId) {
+        const trackingLink = `${window.location.origin}${window.location.pathname}#track/${orderId}`;
+        const modalHTML = `
+             <div id="success-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-40"></div>
+            <div id="success-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md transform scale-95 opacity-0 transition-all duration-200 text-center p-6">
+                    <i data-lucide="check-circle-2" class="w-16 h-16 text-green-500 mx-auto mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800">Order Created!</h2>
+                    <p class="text-gray-500 mt-2">Order #${orderId} has been successfully created.</p>
+                    <div class="bg-gray-100 p-3 rounded-lg my-4">
+                         <label class="block text-sm font-medium text-gray-700 mb-1">Shareable Customer Tracking Link:</label>
+                         <div class="flex items-center gap-2">
+                            <input type="text" readonly id="success-tracking-link" value="${trackingLink}" class="w-full text-sm bg-gray-200 p-2 rounded-md border-transparent focus:ring-0">
+                            <button id="copy-success-link-btn" class="bg-blue-100 text-blue-700 p-2 rounded-md hover:bg-blue-200"><i data-lucide="copy" class="w-5 h-5"></i></button>
+                         </div>
+                    </div>
+                    <button id="close-success-modal-btn" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Done</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('modal-container').innerHTML = modalHTML;
+        lucide.createIcons();
+
+        const modal = document.querySelector('#success-modal > div');
+        const backdrop = document.getElementById('success-modal-backdrop');
+        const closeBtn = document.getElementById('close-success-modal-btn');
+        const copyBtn = document.getElementById('copy-success-link-btn');
+
+        const closeModal = () => {
+            modal.classList.add('scale-95', 'opacity-0');
+            backdrop.classList.add('opacity-0');
+            setTimeout(() => {
+                document.getElementById('modal-container').innerHTML = '';
+                window.location.hash = '#orders'; // Navigate after closing
+            }, 200);
+        };
+        
+        setTimeout(() => modal.classList.remove('scale-95', 'opacity-0'), 10);
+        backdrop.addEventListener('click', closeModal);
+        closeBtn.addEventListener('click', closeModal);
+        copyBtn.addEventListener('click', (e) => {
+             copyToClipboard(trackingLink, () => {
+                showToast('Tracking link copied to clipboard!');
+                const icon = e.currentTarget.querySelector('i');
+                icon.setAttribute('data-lucide', 'check');
+                lucide.createIcons();
+            });
+        });
+    }
+
+
+    // --- ROUTER & SIDEBAR ---
+    const contentArea = document.getElementById('content-area');
+    const appContainer = document.getElementById('app-container');
+
+    function renderSidebar() {
+        const navLinks = [
+            { href: '#orders', icon: 'shopping-cart', text: 'Orders', roles: ['admin', 'moderator'] },
+            { href: '#create-order', icon: 'plus-circle', text: 'Create Order', roles: ['admin', 'moderator'] },
+            { href: '#catalog', icon: 'book-open', text: 'Catalog', roles: ['admin'] },
+            { href: '#batches', icon: 'package-check', text: 'Batches', roles: ['admin'] },
+            { href: '#customers', icon: 'users', text: 'Customers', roles: ['admin'] },
+        ];
+
+        const footerLinks = [
+            { href: '#settings', icon: 'settings', text: 'Settings', roles: ['admin'] },
+        ];
+
+        const userRole = state.currentUser.role;
+        const sidebarNav = document.getElementById('sidebar-nav');
+        const sidebarFooter = document.getElementById('sidebar-footer');
+
+        sidebarNav.innerHTML = navLinks
+            .filter(link => link.roles.includes(userRole))
+            .map(link => `
+                <a href="${link.href}" class="sidebar-link flex items-center p-3 rounded-md hover:bg-gray-700 transition-colors">
+                    <i data-lucide="${link.icon}" class="w-5 h-5 mr-3"></i> ${link.text}
+                </a>
+            `).join('');
+
+        sidebarFooter.innerHTML = footerLinks
+            .filter(link => link.roles.includes(userRole))
+            .map(link => `
+                <a href="${link.href}" class="sidebar-link flex items-center p-3 rounded-md hover:bg-gray-700 transition-colors">
+                    <i data-lucide="${link.icon}" class="w-5 h-5 mr-3"></i> ${link.text}
+                </a>
+            `).join('');
+        
+        sidebarFooter.innerHTML += `
+            <a href="#" id="logout-btn" class="flex items-center p-3 rounded-md hover:bg-gray-700 transition-colors">
+                <i data-lucide="log-out" class="w-5 h-5 mr-3"></i> Logout
+            </a>
+        `;
+        
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            state.currentUser.role = null;
+            window.location.hash = ''; // Clear hash to force re-evaluation
+            location.reload(); // Simple way to reset state
+        });
+
+        lucide.createIcons();
+    }
+
+    function navigate(hash) {
+        const path = hash.substring(1);
+        const [page, id] = path.split('/');
+
+        // Role-based Access Control
+        const moderatorRestrictedPages = ['catalog', 'batches', 'customers', 'settings'];
+        if (state.currentUser.role === 'moderator' && moderatorRestrictedPages.includes(page)) {
+            showToast('Access Denied. You do not have permission to view this page.', 'error');
+            window.location.hash = '#orders';
+            return;
+        }
+
+        // Route for batch details: #batches/501
+        if (page === 'batches' && id) {
+            contentArea.innerHTML = pages.batchDetails;
+            initBatchDetailsPage(id);
+        } 
+        // Route for all other pages
+        else if (pages[page]) {
+            contentArea.innerHTML = pages[page];
+            
+            if (page === 'catalog') initCatalogPage();
+            if (page === 'create-order') initCreateOrderPage();
+            if (page === 'orders') initOrdersPage();
+            if (page === 'batches') initBatchesPage();
+            else if (page === 'customers') initCustomersPage();
+            if (page === 'settings') initSettingsPage();
+        }
+
+        // Update active sidebar link
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${page}`);
+        });
+    }
+
+    // --- APP INITIALIZATION ---
+    function init() {
+        lucide.createIcons();
+        document.getElementById('app-name').textContent = state.settings.appName;
+        
+        const loginForm = document.getElementById('login-form');
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const selectedRole = document.getElementById('role').value;
+            state.currentUser.role = selectedRole;
+
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('main-app').classList.remove('hidden');
+            
+            renderSidebar();
+            
+            const initialHash = window.location.hash || '#orders';
+            navigate(initialHash);
+        });
+        
+        // Main router logic that decides to show tracking page or login/app
+        const handleRouting = () => {
+            const hash = window.location.hash;
+            const path = hash.substring(1);
+            const [page, id] = path.split('/');
+            
+            if(page === 'track' && id) {
+                appContainer.innerHTML = pages.track;
+                initTrackingPage(id);
+            } else if (state.currentUser.role) {
+                // Already logged in, just navigate
+                navigate(hash || '#orders');
+            } else {
+                // Not a tracking page and not logged in, show login
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
+            }
+        };
+
+        window.addEventListener('hashchange', handleRouting);
+        
+        // Initial load
+        handleRouting();
+    }
+
+    init();
+</script>
+
+</body>
+</html>
+
