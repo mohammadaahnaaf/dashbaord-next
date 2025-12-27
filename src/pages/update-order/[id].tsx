@@ -879,265 +879,7 @@ export default function UpdateOrderPage() {
         <h1 className="text-2xl font-semibold">Update Order #{orderId}</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Customer & Delivery */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-lg font-semibold mb-4">Customer & Delivery</h2>
-
-            <div className="space-y-4 grid grid-cols-2 gap-2">
-              <div ref={customerInputRef} className="relative col-span-2">
-                <Input
-                  label="Customer Name"
-                  value={formData.customer_name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      customer_name: e.target.value,
-                    }))
-                  }
-                  onFocus={() => {
-                    if (
-                      formData.customer_name.length > 0 &&
-                      filteredCustomers.length > 0
-                    ) {
-                      setShowCustomerSuggestions(true);
-                    }
-                  }}
-                  required
-                />
-                {showCustomerSuggestions && filteredCustomers.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {filteredCustomers.slice(0, 10).map((customer) => (
-                      <div
-                        key={customer.id}
-                        onClick={() => handleCustomerSelect(customer)}
-                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="font-medium text-gray-900">
-                          {customer.name}
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {customer.phone}
-                          {customer.address && ` • ${customer.address}`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Input
-                label="Phone"
-                value={formData.customer_phone}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    customer_phone: e.target.value,
-                  }))
-                }
-                required
-              />
-
-              <div className="col-span-2">
-                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Address
-                </label>
-                <textarea
-                  className="block w-full px-4 py-3 text-base border border-gray-200 rounded-xl transition-all duration-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent hover:border-gray-300 focus:shadow-lg"
-                  value={formData.delivery_address}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      delivery_address: e.target.value,
-                    }))
-                  }
-                  rows={3}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-3">Pathao Location</h3>
-              {pathaoError && (
-                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-800">
-                    {pathaoError}. Please ensure you have generated a Pathao
-                    token.
-                  </p>
-                </div>
-              )}
-              <div className="space-y-4 grid grid-cols-3 gap-2">
-                <Select
-                  label="City"
-                  value={formData.pathao_city_id?.toString() || ""}
-                  onChange={(e) => {
-                    const cityId = e.target.value
-                      ? parseInt(e.target.value, 10)
-                      : undefined;
-                    const selectedCity = cities.find(
-                      (c) => c.city_id === cityId
-                    );
-                    setFormData((prev) => ({
-                      ...prev,
-                      pathao_city_id: cityId,
-                      pathao_district: selectedCity?.city_name || undefined,
-                      pathao_zone_id: undefined,
-                      pathao_zone: undefined,
-                      pathao_area_id: undefined,
-                      pathao_area: undefined,
-                    }));
-                    if (cityId) {
-                      fetchZones(cityId);
-                    }
-                  }}
-                  options={[
-                    {
-                      value: "",
-                      label: pathaoLoading
-                        ? "Loading cities..."
-                        : "Select City",
-                    },
-                    ...cities.map((city) => ({
-                      value: city.city_id.toString(),
-                      label: city.city_name.trim(),
-                    })),
-                  ]}
-                  disabled={pathaoLoading}
-                />
-                <Select
-                  label="Zone"
-                  value={formData.pathao_zone_id?.toString() || ""}
-                  onChange={(e) => {
-                    const zoneId = e.target.value
-                      ? parseInt(e.target.value, 10)
-                      : undefined;
-                    const selectedZone = zones.find(
-                      (z) => z.zone_id === zoneId
-                    );
-                    setFormData((prev) => ({
-                      ...prev,
-                      pathao_zone_id: zoneId,
-                      pathao_zone: selectedZone?.zone_name || undefined,
-                      pathao_area_id: undefined,
-                      pathao_area: undefined,
-                    }));
-                    if (zoneId) {
-                      fetchAreas(zoneId);
-                    }
-                  }}
-                  options={[
-                    {
-                      value: "",
-                      label: pathaoLoading ? "Loading zones..." : "Select Zone",
-                    },
-                    ...zones.map((zone) => ({
-                      value: zone.zone_id.toString(),
-                      label: zone.zone_name.trim(),
-                    })),
-                  ]}
-                  disabled={!formData.pathao_city_id || pathaoLoading}
-                />
-                <Select
-                  label="Area"
-                  value={formData.pathao_area_id?.toString() || ""}
-                  onChange={(e) => {
-                    const areaId = e.target.value
-                      ? parseInt(e.target.value, 10)
-                      : undefined;
-                    const selectedArea = areas.find(
-                      (a) => a.area_id === areaId
-                    );
-                    setFormData((prev) => ({
-                      ...prev,
-                      pathao_area_id: areaId,
-                      pathao_area: selectedArea?.area_name || undefined,
-                    }));
-                  }}
-                  options={[
-                    {
-                      value: "",
-                      label: pathaoLoading ? "Loading areas..." : "Select Area",
-                    },
-                    ...areas.map((area) => ({
-                      value: area.area_id.toString(),
-                      label: area.area_name.trim(),
-                    })),
-                  ]}
-                  disabled={!formData.pathao_zone_id || pathaoLoading}
-                />
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">
-                Delivery Charge (BDT)
-              </h3>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="delivery_type"
-                    value="inside_dhaka"
-                    checked={formData.delivery_type === "inside_dhaka"}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        delivery_type: e.target.value as
-                          | "inside_dhaka"
-                          | "sub_dhaka"
-                          | "outside_dhaka",
-                      }))
-                    }
-                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>Inside Dhaka</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="delivery_type"
-                    value="sub_dhaka"
-                    checked={formData.delivery_type === "sub_dhaka"}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        delivery_type: e.target.value as
-                          | "inside_dhaka"
-                          | "sub_dhaka"
-                          | "outside_dhaka",
-                      }))
-                    }
-                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>Sub Dhaka</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="delivery_type"
-                    value="outside_dhaka"
-                    checked={formData.delivery_type === "outside_dhaka"}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        delivery_type: e.target.value as
-                          | "inside_dhaka"
-                          | "sub_dhaka"
-                          | "outside_dhaka",
-                      }))
-                    }
-                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>Outside Dhaka</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Order Items */}
+      <div className="grid gap-6">
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-semibold mb-4">Order Items</h2>
@@ -1162,7 +904,10 @@ export default function UpdateOrderPage() {
                     const hasVariants = colors.length > 0 || sizes.length > 0;
 
                     return (
-                      <div key={product.id} className="border-b border-gray-100 last:border-b-0">
+                      <div
+                        key={product.id}
+                        className="border-b border-gray-100 last:border-b-0"
+                      >
                         {/* Main product option */}
                         <div
                           onClick={() => {
@@ -1188,13 +933,22 @@ export default function UpdateOrderPage() {
                                 {product.name}
                               </div>
                               <div className="text-sm text-gray-500">
-                                Code: {product.code} • {formatBDT(product.sell_price_bdt)}
+                                Code: {product.code} •{" "}
+                                {formatBDT(product.sell_price_bdt)}
                               </div>
                               {hasVariants && (
                                 <div className="text-xs text-blue-600 mt-1">
-                                  {colors.length > 0 && `${colors.length} color${colors.length > 1 ? 's' : ''}`}
-                                  {colors.length > 0 && sizes.length > 0 && ' • '}
-                                  {sizes.length > 0 && `${sizes.length} size${sizes.length > 1 ? 's' : ''}`}
+                                  {colors.length > 0 &&
+                                    `${colors.length} color${
+                                      colors.length > 1 ? "s" : ""
+                                    }`}
+                                  {colors.length > 0 &&
+                                    sizes.length > 0 &&
+                                    " • "}
+                                  {sizes.length > 0 &&
+                                    `${sizes.length} size${
+                                      sizes.length > 1 ? "s" : ""
+                                    }`}
                                 </div>
                               )}
                             </div>
@@ -1204,20 +958,48 @@ export default function UpdateOrderPage() {
                         {/* Variant options if product has variants */}
                         {hasVariants && (
                           <div className="bg-gray-50 border-t border-gray-100">
-                            {colors.length > 0 && sizes.length > 0 ? (
-                              // Show all color-size combinations
-                              colors.flatMap((color) =>
-                                sizes.map((size) => (
+                            {colors.length > 0 && sizes.length > 0
+                              ? // Show all color-size combinations
+                                colors.flatMap((color) =>
+                                  sizes.map((size) => (
+                                    <div
+                                      key={`${product.id}-${color}-${size}`}
+                                      onClick={() => {
+                                        handleSelectProductWithVariant(
+                                          product,
+                                          color,
+                                          size
+                                        );
+                                      }}
+                                      className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-gray-700">
+                                          {color} / {size}
+                                        </span>
+                                        <span className="text-gray-500 text-xs">
+                                          {formatBDT(product.sell_price_bdt)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                )
+                              : colors.length > 0
+                              ? // Only colors, no sizes
+                                colors.map((color) => (
                                   <div
-                                    key={`${product.id}-${color}-${size}`}
+                                    key={`${product.id}-${color}`}
                                     onClick={() => {
-                                      handleSelectProductWithVariant(product, color, size);
+                                      handleSelectProductWithVariant(
+                                        product,
+                                        color
+                                      );
                                     }}
                                     className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
                                   >
                                     <div className="flex items-center justify-between">
                                       <span className="text-gray-700">
-                                        {color} / {size}
+                                        {color}
                                       </span>
                                       <span className="text-gray-500 text-xs">
                                         {formatBDT(product.sell_price_bdt)}
@@ -1225,44 +1007,29 @@ export default function UpdateOrderPage() {
                                     </div>
                                   </div>
                                 ))
-                              )
-                            ) : colors.length > 0 ? (
-                              // Only colors, no sizes
-                              colors.map((color) => (
-                                <div
-                                  key={`${product.id}-${color}`}
-                                  onClick={() => {
-                                    handleSelectProductWithVariant(product, color);
-                                  }}
-                                  className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-gray-700">{color}</span>
-                                    <span className="text-gray-500 text-xs">
-                                      {formatBDT(product.sell_price_bdt)}
-                                    </span>
+                              : // Only sizes, no colors
+                                sizes.map((size) => (
+                                  <div
+                                    key={`${product.id}-${size}`}
+                                    onClick={() => {
+                                      handleSelectProductWithVariant(
+                                        product,
+                                        undefined,
+                                        size
+                                      );
+                                    }}
+                                    className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-700">
+                                        Size: {size}
+                                      </span>
+                                      <span className="text-gray-500 text-xs">
+                                        {formatBDT(product.sell_price_bdt)}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              ))
-                            ) : (
-                              // Only sizes, no colors
-                              sizes.map((size) => (
-                                <div
-                                  key={`${product.id}-${size}`}
-                                  onClick={() => {
-                                    handleSelectProductWithVariant(product, undefined, size);
-                                  }}
-                                  className="px-4 py-2 pl-12 hover:bg-gray-100 cursor-pointer transition-colors text-sm"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-gray-700">Size: {size}</span>
-                                    <span className="text-gray-500 text-xs">
-                                      {formatBDT(product.sell_price_bdt)}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))
-                            )}
+                                ))}
                           </div>
                         )}
                       </div>
@@ -1522,17 +1289,271 @@ export default function UpdateOrderPage() {
                   onChange={(e) => setEstimatedDeliveryDate(e.target.value)}
                 />
               </div>
-
-              {/* Update Order Button */}
-              <Button
-                onClick={handleUpdateOrder}
-                disabled={isSaving}
-                className="w-full mt-4 bg-green-600 hover:bg-green-700"
-              >
-                {isSaving ? "Updating..." : "Update Order"}
-              </Button>
             </div>
           </div>
+        </div>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-semibold mb-4">Customer & Delivery</h2>
+
+            <div className="space-y-4 grid grid-cols-2 gap-2">
+              <div ref={customerInputRef} className="relative">
+                <Input
+                  label="Customer Name"
+                  value={formData.customer_name}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      customer_name: e.target.value,
+                    }))
+                  }
+                  onFocus={() => {
+                    if (
+                      formData.customer_name.length > 0 &&
+                      filteredCustomers.length > 0
+                    ) {
+                      setShowCustomerSuggestions(true);
+                    }
+                  }}
+                  required
+                />
+                {showCustomerSuggestions && filteredCustomers.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredCustomers.slice(0, 10).map((customer) => (
+                      <div
+                        key={customer.id}
+                        onClick={() => handleCustomerSelect(customer)}
+                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-medium text-gray-900">
+                          {customer.name}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {customer.phone}
+                          {customer.address && ` • ${customer.address}`}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Input
+                label="Phone"
+                value={formData.customer_phone}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    customer_phone: e.target.value,
+                  }))
+                }
+                required
+              />
+
+              <div className="col-span-2">
+                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                  Address
+                </label>
+                <textarea
+                  className="block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl transition-all duration-200 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 hover:border-gray-300"
+                  value={formData.delivery_address}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      delivery_address: e.target.value,
+                    }))
+                  }
+                  rows={3}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-3">Pathao Location</h3>
+              {pathaoError && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">
+                    {pathaoError}. Please ensure you have generated a Pathao
+                    token.
+                  </p>
+                </div>
+              )}
+              <div className="space-y-4 grid grid-cols-3 gap-2">
+                <Select
+                  label="City"
+                  value={formData.pathao_city_id?.toString() || ""}
+                  onChange={(e) => {
+                    const cityId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedCity = cities.find(
+                      (c) => c.city_id === cityId
+                    );
+                    setFormData((prev) => ({
+                      ...prev,
+                      pathao_city_id: cityId,
+                      pathao_district: selectedCity?.city_name || undefined,
+                      pathao_zone_id: undefined,
+                      pathao_zone: undefined,
+                      pathao_area_id: undefined,
+                      pathao_area: undefined,
+                    }));
+                    if (cityId) {
+                      fetchZones(cityId);
+                    }
+                  }}
+                  options={[
+                    {
+                      value: "",
+                      label: pathaoLoading
+                        ? "Loading cities..."
+                        : "Select City",
+                    },
+                    ...cities.map((city) => ({
+                      value: city.city_id.toString(),
+                      label: city.city_name.trim(),
+                    })),
+                  ]}
+                  disabled={pathaoLoading}
+                />
+                <Select
+                  label="Zone"
+                  value={formData.pathao_zone_id?.toString() || ""}
+                  onChange={(e) => {
+                    const zoneId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedZone = zones.find(
+                      (z) => z.zone_id === zoneId
+                    );
+                    setFormData((prev) => ({
+                      ...prev,
+                      pathao_zone_id: zoneId,
+                      pathao_zone: selectedZone?.zone_name || undefined,
+                      pathao_area_id: undefined,
+                      pathao_area: undefined,
+                    }));
+                    if (zoneId) {
+                      fetchAreas(zoneId);
+                    }
+                  }}
+                  options={[
+                    {
+                      value: "",
+                      label: pathaoLoading ? "Loading zones..." : "Select Zone",
+                    },
+                    ...zones.map((zone) => ({
+                      value: zone.zone_id.toString(),
+                      label: zone.zone_name.trim(),
+                    })),
+                  ]}
+                  disabled={!formData.pathao_city_id || pathaoLoading}
+                />
+                <Select
+                  label="Area"
+                  value={formData.pathao_area_id?.toString() || ""}
+                  onChange={(e) => {
+                    const areaId = e.target.value
+                      ? parseInt(e.target.value, 10)
+                      : undefined;
+                    const selectedArea = areas.find(
+                      (a) => a.area_id === areaId
+                    );
+                    setFormData((prev) => ({
+                      ...prev,
+                      pathao_area_id: areaId,
+                      pathao_area: selectedArea?.area_name || undefined,
+                    }));
+                  }}
+                  options={[
+                    {
+                      value: "",
+                      label: pathaoLoading ? "Loading areas..." : "Select Area",
+                    },
+                    ...areas.map((area) => ({
+                      value: area.area_id.toString(),
+                      label: area.area_name.trim(),
+                    })),
+                  ]}
+                  disabled={!formData.pathao_zone_id || pathaoLoading}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">
+                Delivery Charge (BDT)
+              </h3>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="delivery_type"
+                    value="inside_dhaka"
+                    checked={formData.delivery_type === "inside_dhaka"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        delivery_type: e.target.value as
+                          | "inside_dhaka"
+                          | "sub_dhaka"
+                          | "outside_dhaka",
+                      }))
+                    }
+                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Inside Dhaka</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="delivery_type"
+                    value="sub_dhaka"
+                    checked={formData.delivery_type === "sub_dhaka"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        delivery_type: e.target.value as
+                          | "inside_dhaka"
+                          | "sub_dhaka"
+                          | "outside_dhaka",
+                      }))
+                    }
+                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Sub Dhaka</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="delivery_type"
+                    value="outside_dhaka"
+                    checked={formData.delivery_type === "outside_dhaka"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        delivery_type: e.target.value as
+                          | "inside_dhaka"
+                          | "sub_dhaka"
+                          | "outside_dhaka",
+                      }))
+                    }
+                    className="rounded-full border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Outside Dhaka</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          {/* Save Order Button */}
+          <Button
+            onClick={handleUpdateOrder}
+            disabled={isSaving}
+            className="w-full mt-4 bg-green-600 hover:bg-green-700"
+          >
+            {isSaving ? "Updating..." : "Update Order"}
+          </Button>
 
           {/* Pathao Panel */}
           <div className="bg-white rounded-lg shadow-sm p-6">

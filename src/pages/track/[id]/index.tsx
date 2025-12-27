@@ -177,7 +177,7 @@ export default function TrackingPage() {
                       )}
                     </div>
                     <span
-                      className={`mt-2 text-xs font-bold sm:text-sm font-medium text-center ${textColor}`}
+                      className={`mt-2 text-xs font-bold sm:text-sm text-center ${textColor}`}
                     >
                       {status}
                     </span>

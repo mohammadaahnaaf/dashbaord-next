@@ -225,14 +225,17 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   ref?: React.RefObject<HTMLInputElement | null>;
 }
 
-export function Input({ label, error, className, icon, ref, ...props }: InputProps & { ref?: React.RefObject<HTMLInputElement | null> }) {
+export function Input({
+  label,
+  error,
+  className,
+  icon,
+  ref,
+  ...props
+}: InputProps & { ref?: React.RefObject<HTMLInputElement | null> }) {
   return (
     <div className="space-y-2">
-      {label && (
-        <label className="block text-sm font-semibold">
-          {label}
-        </label>
-      )}
+      {label && <label className="block text-sm font-semibold">{label}</label>}
       <div className="relative">
         {icon && (
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -242,11 +245,11 @@ export function Input({ label, error, className, icon, ref, ...props }: InputPro
         <input
           ref={ref}
           className={cn(
-            "block w-full px-4 py-3 text-base border-2 !border-gray-200 rounded-xl transition-all duration-200",
-            "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-            "hover:border-gray-300 focus:shadow-lg disabled:bg-gray-50 disabled:text-gray-500",
+            "block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl transition-all duration-200",
+            "placeholder:text-gray-400 focus:outline-none focus:border-blue-500",
+            "hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500",
             icon ? "pl-10" : "",
-            error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
+            error && "border-red-300 focus:border-red-500 hover:border-red-400",
             className
           )}
           {...props}
@@ -285,11 +288,11 @@ export function Textarea({ label, error, className, ...props }: TextareaProps) {
       )}
       <textarea
         className={cn(
-          "block w-full px-4 py-3 text-base border !border-gray-200 rounded-xl transition-all duration-200",
-          "placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-          "hover:border-gray-300 focus:shadow-lg resize-y disabled:bg-gray-50 disabled:text-gray-500",
+          "block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl transition-all duration-200",
+          "placeholder:text-gray-400 focus:outline-none focus:border-blue-500",
+          "hover:border-gray-300 resize-y disabled:bg-gray-50 disabled:text-gray-500",
           "min-h-[100px]",
-          error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
+          error && "border-red-300 focus:border-red-500 hover:border-red-400",
           className
         )}
         {...props}
@@ -334,11 +337,11 @@ export function Select({
       <div className="relative">
         <select
           className={cn(
-            "block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl shadow-sm transition-all duration-200 appearance-none",
-            "bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-            "hover:border-gray-300 focus:shadow-lg disabled:bg-gray-50 disabled:text-gray-500",
+            "block w-full px-4 py-3 text-base border-2 border-gray-200 rounded-xl transition-all duration-200 appearance-none",
+            "bg-white focus:outline-none focus:border-blue-500",
+            "hover:border-gray-300 disabled:bg-gray-50 disabled:text-gray-500",
             "pr-10", // space for dropdown arrow
-            error && "border-red-300 focus:ring-red-500 focus:border-red-500 hover:border-red-400",
+            error && "border-red-300 focus:border-red-500 hover:border-red-400",
             className
           )}
           {...props}
